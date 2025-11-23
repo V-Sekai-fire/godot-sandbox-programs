@@ -8,6 +8,13 @@ TEST_SUITE("Compiler - Basic Function Compilation (from godot-dodo corpus)") {
 )";
         auto result = compileGDScript(source);
         
+        if (!result.success && result.ast) {
+            // Debug: Print AST if parsing succeeded but compilation failed
+            print_ast_message(result.ast.get(), "AST (parse succeeded, compilation failed)");
+        } else if (!result.ast) {
+            MESSAGE("Parse failed. Error: " << result.errorMessage);
+        }
+        
         CHECK(result.success);
         CHECK(result.ast != nullptr);
         if (result.success) {

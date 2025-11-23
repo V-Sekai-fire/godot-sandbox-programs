@@ -10,6 +10,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../src/parser)
 
 # Common parser source files
 set(PARSER_SOURCES
+    ../src/parser/gdscript_tokenizer.cpp
     ../src/parser/gdscript_parser.cpp
     ../src/parser/errors.cpp
 )

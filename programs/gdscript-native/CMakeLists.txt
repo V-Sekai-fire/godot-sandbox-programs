@@ -8,6 +8,7 @@ project(gdscript-native)
 add_ci_program(gdscript_native
 	src/main.cpp
 	src/ast_to_riscv_biscuit.cpp
+	src/parser/gdscript_tokenizer.cpp
 	src/parser/gdscript_parser.cpp
 	src/parser/errors.cpp
 	src/function_registry.cpp
