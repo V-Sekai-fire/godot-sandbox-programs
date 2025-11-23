@@ -1,0 +1,34 @@
+name: Test ELF Execution
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'programs/gdscript-native/test_output/*.elf'
+      - 'programs/gdscript-native/simple_elf_test.cpp'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install QEMU
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-user-static
+      
+      - name: Test ELF execution
+        working-directory: programs/gdscript-native
+        run: |
+          chmod +x test_output/simple.elf
+          qemu-riscv64 test_output/simple.elf
+          EXIT_CODE=$?
+          echo "Exit code: $EXIT_CODE"
+          if [ $EXIT_CODE -eq 42 ]; then
+            echo "✅ SUCCESS: Program returned 42!"
+          else
+            echo "⚠️  Program returned $EXIT_CODE (expected 42)"
+          fi
+          exit $EXIT_CODE
+

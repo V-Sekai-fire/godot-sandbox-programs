@@ -1,0 +1,59 @@
+**/.build/
+**/.embedded/
+**/.zig/
+*.o
+*.a
+*.so
+.vscode/
+
+# Third-party build directories
+thirdparty/llvm-build/
+thirdparty/stablehlo/build/
+thirdparty/llvm-project/build/
+
+# CMake build directories
+build/
+**/build/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.cmake
+!CMakeLists.txt
+
+# Test outputs and executables
+*.elf
+*.bin
+test_output/
+**/test_output/
+test_elf_gen
+test_libriscv
+test_libriscv_debug
+test_page_check
+test_reset_check
+test_exec_segment
+test_debug_simulate
+
+# Debug and temporary files
+*.log
+*.tmp
+gdb_commands.txt
+*.dSYM/
+core
+core.*
+
+# RISC-V toolchain outputs
+*.riscv
+*.s
+*.dump
+
+# IDE files
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+build/
