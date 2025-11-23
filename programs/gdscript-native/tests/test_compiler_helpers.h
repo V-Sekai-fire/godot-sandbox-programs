@@ -71,6 +71,7 @@ static inline CompilationResult compileGDScript(const std::string& source) {
 }
 
 // Helper to execute generated RISC-V code and get result using libriscv C++ API
+// Returns execution result, or 0 on failure
 static inline int64_t execute_generated_code(const uint8_t* code, size_t size) {
     if (code == nullptr || size == 0) {
         return 0;
@@ -100,25 +101,46 @@ static inline int64_t execute_generated_code(const uint8_t* code, size_t size) {
             return 0;
         }
         
+        // Get PC after construction (should be at entry point)
+        address_type<RISCV64> pc_after_construction = machine.cpu.pc();
+        
         // Setup Linux environment (minimal - no arguments)
         machine.setup_linux({"./program"}, {"LC_TYPE=C", "LC_ALL=C", "USER=root"});
         machine.setup_linux_syscalls();
         
-        // CRITICAL: After setup_linux(), the PC might be reset to 0
-        // We MUST explicitly jump to the entry point before simulating
-        // This is because setup_linux() sets up the stack and environment,
-        // but doesn't preserve the PC that was set during construction
-        // Use cpu.jump() to set PC to entry point
+        // Get PC after setup_linux (should still be at entry point)
+        address_type<RISCV64> pc_after_setup = machine.cpu.pc();
+        
+        // If PC is not at entry point after setup_linux(), explicitly jump to it
+        if (pc_after_setup != entry_point) {
+            machine.cpu.jump(entry_point);
+        }
+        
+        // Get PC before simulate (should be at entry point)
+        address_type<RISCV64> pc_before_simulate = machine.cpu.pc();
+        
+        // CRITICAL: Set PC register to entry point before calling simulate()
+        // Even though simulate() takes pc as argument, it may read from cpu.pc() internally
         machine.cpu.jump(entry_point);
         
+        // Verify PC is set correctly
+        address_type<RISCV64> pc_after_jump = machine.cpu.pc();
+        if (pc_after_jump != entry_point) {
+            // PC not set correctly - this shouldn't happen
+            return 0;
+        }
+        
         // Run the program (timeout after 1M instructions)
-        // Use simulate_with<true>() to explicitly pass the entry point PC
-        // This ensures we start execution at the correct address
-        // The template parameter <true> means throw on timeout
-        machine.simulate_with<true>(1000000ULL, 0, entry_point);
+        // Use cpu.simulate() directly with explicit entry point to ensure we start at correct address
+        machine.cpu.simulate(entry_point, 0, 1000000ULL);
         
         // Get return value from a0 register
-        return machine.return_value<int64_t>();
+        int64_t return_value = machine.return_value<int64_t>();
+        
+        // Note: Diagnostics (PC values, entry point) should be printed at test level using MESSAGE
+        // This helper just returns the execution result
+        
+        return return_value;
     } catch (const std::exception& e) {
         // Execution failed
         return 0;

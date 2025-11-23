@@ -322,16 +322,16 @@ void ASTToRISCVEmitter::_emit_return(const ReturnStatement* ret) {
             }
         } else {
             // Complex expression - emit normally and move to a0
-            _emit_expression(ret->value.get());
-            
-            // Get register for return value
-            biscuit::GPR retReg = _get_or_allocate_register(ret->value.get());
-            
-            // Move to a0 (return value register)
-            if (retReg.Index() != biscuit::a0.Index()) {
+        _emit_expression(ret->value.get());
+        
+        // Get register for return value
+        biscuit::GPR retReg = _get_or_allocate_register(ret->value.get());
+        
+        // Move to a0 (return value register)
+        if (retReg.Index() != biscuit::a0.Index()) {
                 _assembler->MV(biscuit::a0, retReg);
-            }
         }
+    }
     } else {
         // No return value - default to 0
         _assembler->LI(biscuit::a0, 0);
