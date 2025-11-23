@@ -201,7 +201,7 @@ This ensures that the offset from the segment base in memory equals the offset f
 ```bash
 # Build test program
 cd programs/gdscript-native
-g++ -std=c++20 -I../../thirdparty/libriscv/lib \
+g++ -std=c++20 -I../../ext/libriscv/lib \
     -o test_libriscv test_libriscv.cpp -lriscv -framework Security
 
 # Run test (normal mode)
@@ -501,7 +501,7 @@ struct CompilerOptions {
 3. **Test Data Infrastructure**
    - Test data loader (`test_data_loader.h/cpp`)
    - Integration with godot-dodo dataset (60k+ GDScript samples)
-   - Dataset located at `thirdparty/godot-dodo/`
+   - Dataset located at `ext/godot-dodo/`
 
 4. **Testing Infrastructure**
    - doctest framework setup (`tests/doctest.h`)
@@ -642,8 +642,8 @@ struct CompilerOptions {
 
 ### Third-Party Libraries (via git subrepo)
 
-- **godot-dodo**: `thirdparty/godot-dodo/` - GDScript dataset with 60k+ samples
-- **libriscv**: `thirdparty/libriscv/` - RISC-V emulator library (same as used by Godot sandbox)
+- **godot-dodo**: `ext/godot-dodo/` - GDScript dataset with 60k+ samples
+- **libriscv**: `ext/libriscv/` - RISC-V emulator library (same as used by Godot sandbox)
 
 ### External Libraries
 

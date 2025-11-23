@@ -9,11 +9,11 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /workspace
 
-# Copy libriscv from thirdparty (git subrepo)
-COPY thirdparty/libriscv /workspace/thirdparty/libriscv
+# Copy libriscv from ext (git subrepo)
+COPY ext/libriscv /workspace/ext/libriscv
 
 # Build libriscv
-RUN cd /workspace/thirdparty/libriscv && \
+RUN cd /workspace/ext/libriscv && \
     mkdir -p build && cd build && \
     cmake .. -DCMAKE_BUILD_TYPE=Release && \
     make -j$(nproc) && \

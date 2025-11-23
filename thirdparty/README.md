@@ -43,9 +43,9 @@ git subrepo status
 ```bash
 git subrepo pull thirdparty/stablehlo
 git subrepo pull thirdparty/llvm-project
-git subrepo pull thirdparty/libriscv
-git subrepo pull thirdparty/biscuit
-git subrepo pull thirdparty/godot-dodo
+git subrepo pull ext/libriscv
+git subrepo pull ext/biscuit
+git subrepo pull ext/godot-dodo
 git subrepo pull programs/gdscript-native/test_data
 ```
 
@@ -61,11 +61,11 @@ git subrepo clean thirdparty/stablehlo
 
 ## GDScript Dataset (godot-dodo)
 
-The GDScript test dataset is managed as a git subrepo at `thirdparty/godot-dodo/`. It contains the [godot-dodo](https://github.com/minosvasilias/godot-dodo) dataset with 60k+ GDScript samples.
+The GDScript test dataset is managed as a git subrepo at `ext/godot-dodo/`. It contains the [godot-dodo](https://github.com/minosvasilias/godot-dodo) dataset with 60k+ GDScript samples.
 
 The dataset JSON file is located at:
 ```
-thirdparty/godot-dodo/data/godot_dodo_4x_60k/godot_dodo_4x_60k_data.json
+ext/godot-dodo/data/godot_dodo_4x_60k/godot_dodo_4x_60k_data.json
 ```
 
 Note: There is also a copy/symlink at `programs/gdscript-native/test_data/` for convenience.
@@ -80,7 +80,7 @@ libriscv is a header-only library with optional CMake build. To use it:
 
 ```bash
 # Update libriscv subrepo
-git subrepo pull thirdparty/libriscv
+git subrepo pull ext/libriscv
 ```
 
 ### Usage
@@ -99,16 +99,18 @@ target_link_libraries(your_target riscv)
 ## Directory Structure
 
 ```
+ext/
+├── godot-dodo/         # GDScript dataset (godot-dodo, git subrepo)
+├── libriscv/           # RISC-V emulator library (git subrepo)
+└── biscuit/            # RISC-V code generator (git subrepo)
+
 thirdparty/
 ├── stablehlo/          # StableHLO repository (git subrepo)
 ├── llvm-project/       # LLVM project repository (git subrepo)
-├── godot-dodo/         # GDScript dataset (godot-dodo, git subrepo)
-├── libriscv/           # RISC-V emulator library (git subrepo)
-├── biscuit/            # RISC-V code generator (git subrepo)
 └── llvm-build/         # LLVM build directory (not in git)
 
 programs/gdscript-native/
-└── test_data/          # GDScript dataset (symlink or copy of thirdparty/godot-dodo)
+└── test_data/          # GDScript dataset (symlink or copy of ext/godot-dodo)
 ```
 
 ## CMake Configuration

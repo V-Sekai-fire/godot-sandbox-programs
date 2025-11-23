@@ -4,18 +4,18 @@ This document explains how to test generated RISC-V ELF binaries using `libriscv
 
 ## libriscv Setup
 
-`libriscv` is managed as a git subrepo in `thirdparty/libriscv/`.
+`libriscv` is managed as a git subrepo in `ext/libriscv/`.
 
 ### Update libriscv
 
 ```bash
-git subrepo pull thirdparty/libriscv
+git subrepo pull ext/libriscv
 ```
 
 ### Build libriscv
 
 ```bash
-cd thirdparty/libriscv/lib
+cd ext/libriscv/lib
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j$(nproc)
@@ -31,7 +31,7 @@ The `test_libriscv.cpp` program loads and executes an ELF file:
 ```bash
 # Build the test program
 cd programs/gdscript-native
-g++ -std=c++20 -I../../thirdparty/libriscv/lib \
+g++ -std=c++20 -I../../ext/libriscv/lib \
     -o test_libriscv test_libriscv.cpp -lriscv
 
 # Run test
@@ -49,7 +49,7 @@ docker run --rm test-libriscv
 ```
 
 The Dockerfile:
-- Copies `thirdparty/libriscv/` from the git subrepo
+- Copies `ext/libriscv/` from the git subrepo
 - Builds libriscv using CMake
 - Compiles `test_libriscv.cpp`
 - Executes the test with `simple.elf`
@@ -116,7 +116,7 @@ Instructions executed: 12345
 
 If `-lriscv` fails, build libriscv first:
 ```bash
-cd thirdparty/libriscv/lib
+cd ext/libriscv/lib
 mkdir build && cd build
 cmake .. && make
 # Then link with: -L/path/to/libriscv/lib/build -lriscv
@@ -126,12 +126,12 @@ cmake .. && make
 
 Make sure to include the correct path:
 ```cpp
-#include <libriscv/machine.hpp>  // From thirdparty/libriscv/lib/libriscv/
+#include <libriscv/machine.hpp>  // From ext/libriscv/lib/libriscv/
 ```
 
 Use compile flag:
 ```bash
--I../../thirdparty/libriscv/lib
+-I../../ext/libriscv/lib
 ```
 
 ## References

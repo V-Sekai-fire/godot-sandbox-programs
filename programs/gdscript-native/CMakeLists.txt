@@ -17,9 +17,9 @@ add_ci_program(gdscript_native
 )
 
 # Add biscuit library (RISC-V assembler, similar to AsmJit)
-# Biscuit is available as a git subrepo in thirdparty/biscuit
+# Biscuit is available as a git subrepo in ext/biscuit
 # Biscuit is header-only, just need to include the directory
-target_include_directories(gdscript_native PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../thirdparty/biscuit/include)
+target_include_directories(gdscript_native PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../ext/biscuit/include)
 
 # Set C++20 standard (required for biscuit library)
 set_target_properties(gdscript_native PROPERTIES
