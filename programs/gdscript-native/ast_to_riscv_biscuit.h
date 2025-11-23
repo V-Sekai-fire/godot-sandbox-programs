@@ -28,6 +28,9 @@ private:
     size_t _temp_reg_index;
     const FunctionNode* _current_function; // Track current function being emitted
     
+    // Label management for control flow
+    std::vector<std::unique_ptr<biscuit::Label>> _labels;
+    
     // RISC-V registers: a0-a7 (arguments/returns), t0-t6 (temporaries), s0-s11 (saved)
     static constexpr biscuit::GPR _temp_regs[] = {
         biscuit::t0, biscuit::t1, biscuit::t2,
@@ -51,8 +54,11 @@ private:
     void _emit_literal(const LiteralExpr* lit);
     void _emit_identifier(const IdentifierExpr* ident);
     void _emit_binary_op(const BinaryOpExpr* binop);
+    void _emit_call(const CallExpr* call);
     void _emit_return(const ReturnStatement* ret);
     void _emit_variable_declaration(const VariableDeclaration* var_decl);
+    void _emit_assignment(const AssignmentStatement* assign);
+    void _emit_if_statement(const IfStatement* if_stmt);
     
     // Reset state for new function (private, use _ prefix)
     void _reset_function_state();

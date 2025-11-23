@@ -102,6 +102,14 @@ void ASTToRISCVEmitter::_emit_statement(const StatementNode* stmt) {
             _emit_variable_declaration(static_cast<const VariableDeclaration*>(stmt));
             break;
         
+        case ASTNode::NodeType::AssignmentStatement:
+            _emit_assignment(static_cast<const AssignmentStatement*>(stmt));
+            break;
+        
+        case ASTNode::NodeType::IfStatement:
+            _emit_if_statement(static_cast<const IfStatement*>(stmt));
+            break;
+        
         // TODO: Add other statement types
         default:
             break;
@@ -128,6 +136,10 @@ void ASTToRISCVEmitter::_emit_expression(const ExpressionNode* expr) {
         
         case ASTNode::NodeType::BinaryOpExpr:
             _emit_binary_op(static_cast<const BinaryOpExpr*>(expr));
+            break;
+        
+        case ASTNode::NodeType::CallExpr:
+            _emit_call(static_cast<const CallExpr*>(expr));
             break;
         
         // TODO: Add other expression types
@@ -185,6 +197,20 @@ void ASTToRISCVEmitter::_emit_identifier(const IdentifierExpr* ident) {
     
     // Track register for this expression
     _expr_to_reg[ident] = reg;
+}
+
+void ASTToRISCVEmitter::_emit_call(const CallExpr* call) {
+    if (!call || !_assembler || !_current_function) {
+        return;
+    }
+    
+    // For now, stub out function calls - return 0
+    // TODO: Implement proper function call support using function registry
+    biscuit::GPR result_reg = _allocate_register();
+    _assembler->LI(result_reg, 0);
+    
+    // Map the call expression to the result register
+    _expr_to_reg[call] = result_reg;
 }
 
 void ASTToRISCVEmitter::_emit_binary_op(const BinaryOpExpr* binop) {
@@ -278,6 +304,115 @@ void ASTToRISCVEmitter::_emit_return(const ReturnStatement* ret) {
     // a0 already contains the return value
     _assembler->LI(biscuit::a7, 94);  // syscall number for exit_group
     _assembler->ECALL();               // Make syscall (exits program)
+}
+
+void ASTToRISCVEmitter::_emit_assignment(const AssignmentStatement* assign) {
+    if (!assign || !_assembler || !_current_function) {
+        return;
+    }
+    
+    // Get target variable name (must be IdentifierExpr)
+    if (!assign->target || assign->target->get_type() != ASTNode::NodeType::IdentifierExpr) {
+        return; // Only support simple variable assignments for now
+    }
+    
+    const IdentifierExpr* target_ident = static_cast<const IdentifierExpr*>(assign->target.get());
+    std::string var_name = target_ident->name;
+    
+    // Emit value expression
+    if (assign->value) {
+        _emit_expression(assign->value.get());
+        biscuit::GPR value_reg = _get_or_allocate_register(assign->value.get());
+        
+        // Get or allocate stack offset for variable
+        int stack_offset = _get_var_stack_offset(var_name);
+        if (stack_offset < 0) {
+            // Variable not found, allocate new stack slot
+            stack_offset = _allocate_stack(var_name);
+        }
+        
+        // Store value to variable's stack location
+        _assembler->SD(value_reg, stack_offset, biscuit::sp);
+        
+        // Update expression-to-register mapping for the target variable
+        // This allows the variable to be used in subsequent expressions
+        // Note: We need to create a temporary IdentifierExpr for lookup
+        // For now, we'll just store the register mapping by variable name
+        // This is a simplification - proper implementation would track by expression node
+    }
+}
+
+void ASTToRISCVEmitter::_emit_if_statement(const IfStatement* if_stmt) {
+    if (!if_stmt || !_assembler || !_current_function) {
+        return;
+    }
+    
+    // Emit condition expression
+    if (if_stmt->condition) {
+        _emit_expression(if_stmt->condition.get());
+        biscuit::GPR cond_reg = _get_or_allocate_register(if_stmt->condition.get());
+        
+        // Create labels
+        auto else_label = std::make_unique<biscuit::Label>();
+        auto end_label = std::make_unique<biscuit::Label>();
+        biscuit::Label* else_ptr = else_label.get();
+        biscuit::Label* end_ptr = end_label.get();
+        _labels.push_back(std::move(else_label));
+        _labels.push_back(std::move(end_label));
+        
+        // Branch if condition is false (0) - jump to else/end
+        _assembler->BEQZ(cond_reg, else_ptr);
+        
+        // Emit then body
+        for (const auto& stmt : if_stmt->then_body) {
+            _emit_statement(stmt.get());
+        }
+        
+        // Jump to end (skip else)
+        _assembler->JAL(end_ptr);
+        
+        // Bind else label
+        _assembler->Bind(else_ptr);
+        
+        // Emit elif branches
+        for (const auto& branch : if_stmt->elif_branches) {
+            auto elif_else_label = std::make_unique<biscuit::Label>();
+            auto elif_end_label = std::make_unique<biscuit::Label>();
+            biscuit::Label* elif_else_ptr = elif_else_label.get();
+            biscuit::Label* elif_end_ptr = elif_end_label.get();
+            _labels.push_back(std::move(elif_else_label));
+            _labels.push_back(std::move(elif_end_label));
+            
+            // Emit elif condition
+            if (branch.first) {
+                _emit_expression(branch.first.get());
+                biscuit::GPR elif_cond_reg = _get_or_allocate_register(branch.first.get());
+                _assembler->BEQZ(elif_cond_reg, elif_else_ptr);
+            }
+            
+            // Emit elif body
+            for (const auto& stmt : branch.second) {
+                _emit_statement(stmt.get());
+            }
+            
+            // Jump to end
+            _assembler->JAL(elif_end_ptr);
+            
+            // Bind elif else label
+            _assembler->Bind(elif_else_ptr);
+            
+            // Update else_ptr for next elif
+            else_ptr = elif_end_ptr;
+        }
+        
+        // Emit else body
+        for (const auto& stmt : if_stmt->else_body) {
+            _emit_statement(stmt.get());
+        }
+        
+        // Bind end label
+        _assembler->Bind(end_ptr);
+    }
 }
 
 void ASTToRISCVEmitter::_emit_variable_declaration(const VariableDeclaration* varDecl) {

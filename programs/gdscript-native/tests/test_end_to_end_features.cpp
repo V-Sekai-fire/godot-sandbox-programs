@@ -146,7 +146,9 @@ void ensure_test_output_dir() {
 TEST_SUITE("End-to-End: Fully Supported Features") {
     
     TEST_CASE("1. Simple Functions - Return Integer Constant") {
-        std::string source = "func test():\n    return 42\n";
+        std::string source = R"(func test():
+    return 42
+)";
         auto result = compileGDScript(source);
         
         REQUIRE(result.success);
@@ -158,7 +160,9 @@ TEST_SUITE("End-to-End: Fully Supported Features") {
     }
     
     TEST_CASE("2. Functions with Parameters - Parse and Compile") {
-        std::string source = "func add(a: int, b: int):\n    return a + b\n";
+        std::string source = R"(func add(a: int, b: int):
+    return a + b
+)";
         auto result = compileGDScript(source);
         
         REQUIRE(result.success);
@@ -170,8 +174,12 @@ TEST_SUITE("End-to-End: Fully Supported Features") {
     }
     
     TEST_CASE("3. Return Statements - Multiple Returns") {
-        std::string source1 = "func test():\n    return 42\n";
-        std::string source2 = "func test():\n    var x = 5\n";
+        std::string source1 = R"(func test():
+    return 42
+)";
+        std::string source2 = R"(func test():
+    var x = 5
+)";
         
         auto result1 = compileGDScript(source1);
         auto result2 = compileGDScript(source2);
@@ -187,8 +195,12 @@ TEST_SUITE("End-to-End: Fully Supported Features") {
     }
     
     TEST_CASE("4. Integer Literals - Positive and Negative") {
-        std::string source1 = "func test():\n    return 42\n";
-        std::string source2 = "func test():\n    return -42\n";
+        std::string source1 = R"(func test():
+    return 42
+)";
+        std::string source2 = R"(func test():
+    return -42
+)";
         
         auto result1 = compileGDScript(source1);
         auto result2 = compileGDScript(source2);
@@ -204,8 +216,12 @@ TEST_SUITE("End-to-End: Fully Supported Features") {
     }
     
     TEST_CASE("5. Boolean Literals - True and False") {
-        std::string source1 = "func test():\n    return true\n";
-        std::string source2 = "func test():\n    return false\n";
+        std::string source1 = R"(func test():
+    return true
+)";
+        std::string source2 = R"(func test():
+    return false
+)";
         
         auto result1 = compileGDScript(source1);
         auto result2 = compileGDScript(source2);
@@ -221,7 +237,9 @@ TEST_SUITE("End-to-End: Fully Supported Features") {
     }
     
     TEST_CASE("6. Null Literals") {
-        std::string source = "func test():\n    return null\n";
+        std::string source = R"(func test():
+    return null
+)";
         auto result = compileGDScript(source);
         
         REQUIRE(result.success);
@@ -231,7 +249,10 @@ TEST_SUITE("End-to-End: Fully Supported Features") {
     }
     
     TEST_CASE("7. Variable Declarations - With Type Hints and Initializers") {
-        std::string source = "func test():\n    var x: int = 10\n    return x\n";
+        std::string source = R"(func test():
+    var x: int = 10
+    return x
+)";
         auto result = compileGDScript(source);
         
         REQUIRE(result.success);
@@ -241,7 +262,10 @@ TEST_SUITE("End-to-End: Fully Supported Features") {
     }
     
     TEST_CASE("8. Variable References - Read Variables") {
-        std::string source = "func test():\n    var x = 5\n    return x\n";
+        std::string source = R"(func test():
+    var x = 5
+    return x
+)";
         auto result = compileGDScript(source);
         
         REQUIRE(result.success);
@@ -252,31 +276,46 @@ TEST_SUITE("End-to-End: Fully Supported Features") {
     
     TEST_CASE("9. Binary Arithmetic Operations - All Operators") {
         // Addition
-        std::string add = "func test():\n    return 2 + 3\n";
+        std::string add = R"(
+func test():
+    return 2 + 3
+)";
         auto result_add = compileGDScript(add);
         REQUIRE(result_add.success);
         CHECK(execute_via_elf(result_add.code) == 5);
         
         // Subtraction
-        std::string sub = "func test():\n    return 10 - 3\n";
+        std::string sub = R"(
+func test():
+    return 10 - 3
+)";
         auto result_sub = compileGDScript(sub);
         REQUIRE(result_sub.success);
         CHECK(execute_via_elf(result_sub.code) == 7);
         
         // Multiplication
-        std::string mul = "func test():\n    return 2 * 3\n";
+        std::string mul = R"(
+func test():
+    return 2 * 3
+)";
         auto result_mul = compileGDScript(mul);
         REQUIRE(result_mul.success);
         CHECK(execute_via_elf(result_mul.code) == 6);
         
         // Division
-        std::string div = "func test():\n    return 10 / 2\n";
+        std::string div = R"(
+func test():
+    return 10 / 2
+)";
         auto result_div = compileGDScript(div);
         REQUIRE(result_div.success);
         CHECK(execute_via_elf(result_div.code) == 5);
         
         // Modulo
-        std::string mod = "func test():\n    return 10 % 3\n";
+        std::string mod = R"(
+func test():
+    return 10 % 3
+)";
         auto result_mod = compileGDScript(mod);
         REQUIRE(result_mod.success);
         CHECK(execute_via_elf(result_mod.code) == 1);
@@ -284,50 +323,73 @@ TEST_SUITE("End-to-End: Fully Supported Features") {
     
     TEST_CASE("10. Comparison Operators - All Operators") {
         // Equality
-        std::string eq = "func test():\n    return 5 == 5\n";
+        std::string eq = R"(
+func test():
+    return 5 == 5
+)";
         auto result_eq = compileGDScript(eq);
         REQUIRE(result_eq.success);
         CHECK(execute_via_elf(result_eq.code) == 1);
         
         // Inequality
-        std::string ne = "func test():\n    return 5 != 3\n";
+        std::string ne = R"(
+func test():
+    return 5 != 3
+)";
         auto result_ne = compileGDScript(ne);
         REQUIRE(result_ne.success);
         CHECK(execute_via_elf(result_ne.code) == 1);
         
         // Less than
-        std::string lt = "func test():\n    return 3 < 5\n";
+        std::string lt = R"(
+func test():
+    return 3 < 5
+)";
         auto result_lt = compileGDScript(lt);
         REQUIRE(result_lt.success);
         CHECK(execute_via_elf(result_lt.code) == 1);
         
         // Greater than
-        std::string gt = "func test():\n    return 5 > 3\n";
+        std::string gt = R"(
+func test():
+    return 5 > 3
+)";
         auto result_gt = compileGDScript(gt);
         REQUIRE(result_gt.success);
         CHECK(execute_via_elf(result_gt.code) == 1);
         
         // Less than or equal
-        std::string le = "func test():\n    return 3 <= 5\n";
+        std::string le = R"(
+func test():
+    return 3 <= 5
+)";
         auto result_le = compileGDScript(le);
         REQUIRE(result_le.success);
         CHECK(execute_via_elf(result_le.code) == 1);
         
         // Greater than or equal
-        std::string ge = "func test():\n    return 5 >= 3\n";
+        std::string ge = R"(
+func test():
+    return 5 >= 3
+)";
         auto result_ge = compileGDScript(ge);
         REQUIRE(result_ge.success);
         CHECK(execute_via_elf(result_ge.code) == 1);
         
         // False cases
-        std::string eq_false = "func test():\n    return 5 == 3\n";
+        std::string eq_false = R"(
+func test():
+    return 5 == 3
+)";
         auto result_eq_false = compileGDScript(eq_false);
         REQUIRE(result_eq_false.success);
         CHECK(execute_via_elf(result_eq_false.code) == 0);
     }
     
     TEST_CASE("11. Complex Expressions - Operator Precedence") {
-        std::string source = "func calc():\n    return 1 + 2 * 3 - 4 / 2\n";
+        std::string source = R"(func calc():
+    return 1 + 2 * 3 - 4 / 2
+)";
         auto result = compileGDScript(source);
         
         REQUIRE(result.success);
@@ -338,9 +400,11 @@ TEST_SUITE("End-to-End: Fully Supported Features") {
     }
     
     TEST_CASE("12. Multiple Functions - Compile Multiple Functions") {
-        std::string source = 
-            "func func1():\n    return 1\n"
-            "func func2():\n    return 2\n";
+        std::string source = R"(func func1():
+    return 1
+func func2():
+    return 2
+)";
         
         auto result = compileGDScript(source);
         
@@ -351,7 +415,9 @@ TEST_SUITE("End-to-End: Fully Supported Features") {
     }
     
     TEST_CASE("13. Functions Without Return - Default Return Value") {
-        std::string source = "func test():\n    var x = 5\n";
+        std::string source = R"(func test():
+    var x = 5
+)";
         auto result = compileGDScript(source);
         
         REQUIRE(result.success);
@@ -361,14 +427,97 @@ TEST_SUITE("End-to-End: Fully Supported Features") {
     }
 }
 
+TEST_SUITE("End-to-End: New Features (Assignments, If/Else)") {
+    TEST_CASE("Assignment Statement") {
+        std::string source = R"(func test():
+    var x = 5
+    x = 10
+    return x
+)";
+        auto result = compileGDScript(source);
+        
+        REQUIRE(result.success);
+        REQUIRE(result.codeSize > 0);
+        
+        int64_t actual = execute_via_elf(result.code);
+        CHECK(actual == 10);
+    }
+    
+    TEST_CASE("If/Else Statement - True Branch") {
+        std::string source = R"(func test():
+    if 5 > 3:
+        return 1
+    else:
+        return 0
+)";
+        auto result = compileGDScript(source);
+        
+        REQUIRE(result.success);
+        REQUIRE(result.codeSize > 0);
+        
+        int64_t actual = execute_via_elf(result.code);
+        CHECK(actual == 1);
+    }
+    
+    TEST_CASE("If/Else Statement - False Branch") {
+        std::string source = R"(func test():
+    if 3 > 5:
+        return 1
+    else:
+        return 0
+)";
+        auto result = compileGDScript(source);
+        
+        REQUIRE(result.success);
+        REQUIRE(result.codeSize > 0);
+        
+        int64_t actual = execute_via_elf(result.code);
+        CHECK(actual == 0);
+    }
+    
+    TEST_CASE("If with Assignment") {
+        std::string source = R"(func test():
+    var x = 0
+    if 5 > 3:
+        x = 10
+    return x
+)";
+        auto result = compileGDScript(source);
+        
+        REQUIRE(result.success);
+        REQUIRE(result.codeSize > 0);
+        
+        int64_t actual = execute_via_elf(result.code);
+        CHECK(actual == 10);
+    }
+    
+    TEST_CASE("If/Elif/Else Statement") {
+        std::string source = R"(func test():
+    if 5 > 10:
+        return 1
+    elif 5 > 3:
+        return 2
+    else:
+        return 0
+)";
+        auto result = compileGDScript(source);
+        
+        REQUIRE(result.success);
+        REQUIRE(result.codeSize > 0);
+        
+        int64_t actual = execute_via_elf(result.code);
+        CHECK(actual == 2);
+    }
+}
+
 TEST_SUITE("End-to-End: Complex Scenarios") {
     
     TEST_CASE("Multiple Variables and Operations") {
-        std::string source = 
-            "func test():\n"
-            "    var a = 10\n"
-            "    var b = 20\n"
-            "    return a + b\n";
+        std::string source = R"(func test():
+    var a = 10
+    var b = 20
+    return a + b
+)";
         
         auto result = compileGDScript(source);
         REQUIRE(result.success);
@@ -378,7 +527,9 @@ TEST_SUITE("End-to-End: Complex Scenarios") {
     }
     
     TEST_CASE("Nested Expressions") {
-        std::string source = "func test():\n    return (2 + 3) * 4\n";
+        std::string source = R"(func test():
+    return (2 + 3) * 4
+)";
         auto result = compileGDScript(source);
         
         REQUIRE(result.success);
@@ -388,7 +539,9 @@ TEST_SUITE("End-to-End: Complex Scenarios") {
     }
     
     TEST_CASE("Comparison in Expression") {
-        std::string source = "func test():\n    return 5 > 3\n";
+        std::string source = R"(func test():
+    return 5 > 3
+)";
         auto result = compileGDScript(source);
         
         REQUIRE(result.success);
@@ -398,11 +551,11 @@ TEST_SUITE("End-to-End: Complex Scenarios") {
     }
     
     TEST_CASE("Variable Used in Binary Operation") {
-        std::string source = 
-            "func test():\n"
-            "    var x = 5\n"
-            "    var y = 3\n"
-            "    return x * y\n";
+        std::string source = R"(func test():
+    var x = 5
+    var y = 3
+    return x * y
+)";
         
         auto result = compileGDScript(source);
         REQUIRE(result.success);
@@ -417,7 +570,9 @@ TEST_SUITE("End-to-End: ELF Generation") {
     TEST_CASE("Generate ELF for Simple Function") {
         ensure_test_output_dir();
         
-        std::string source = "func test():\n    return 42\n";
+        std::string source = R"(func test():
+    return 42
+)";
         auto result = compileGDScript(source);
         
         REQUIRE(result.success);

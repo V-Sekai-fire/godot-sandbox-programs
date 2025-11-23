@@ -390,13 +390,33 @@ TEST_SUITE("Compiler - Integration Tests") {
 // TDD: These tests should FAIL first (features not yet implemented)
 TEST_SUITE("Compiler - TDD: Unimplemented Features (Should Fail)") {
     TEST_CASE("Control flow: if/else statement") {
-        // This should FAIL - if/else not implemented yet
+        // ✅ NOW IMPLEMENTED - if/else parsing and codegen implemented
         std::string source = "func test():\n    if 5 > 3:\n        return 1\n    else:\n        return 0\n";
         auto result = compileGDScript(source);
         
-        // Currently will fail to parse or generate code
-        // Once implemented, this should pass
-        CHECK_FALSE(result.success); // TDD: Expect failure until implemented
+        // Should now compile successfully
+        CHECK(result.success);
+        CHECK(result.codeSize > 0);
+    }
+    
+    TEST_CASE("Assignment statements") {
+        // ✅ NOW IMPLEMENTED - assignment parsing and codegen implemented
+        std::string source = "func test():\n    var x = 5\n    x = 10\n    return x\n";
+        auto result = compileGDScript(source);
+        
+        // Should now compile successfully
+        CHECK(result.success);
+        CHECK(result.codeSize > 0);
+    }
+    
+    TEST_CASE("Function call syntax") {
+        // ✅ NOW IMPLEMENTED - function call parsing implemented (codegen stubbed)
+        std::string source = "func test():\n    return func_name()\n";
+        auto result = compileGDScript(source);
+        
+        // Should parse successfully (codegen may stub out calls)
+        CHECK(result.success);
+        CHECK(result.codeSize > 0);
     }
     
     TEST_CASE("Control flow: while loop") {
@@ -416,15 +436,15 @@ TEST_SUITE("Compiler - TDD: Unimplemented Features (Should Fail)") {
     }
     
     TEST_CASE("Function calls: call other functions") {
-        // This should FAIL - function calls not implemented yet
+        // ✅ NOW IMPLEMENTED - function call parsing implemented (codegen stubbed)
         std::string source = 
             "func add(a: int, b: int):\n    return a + b\n"
             "func test():\n    return add(1, 2)\n";
         auto result = compileGDScript(source);
         
-        // Should compile, but function call codegen not implemented
-        // For now, just check it compiles (call codegen will fail later)
-        // CHECK_FALSE(result.success); // May compile but call won't work
+        // Should parse successfully (codegen stubs out calls for now)
+        CHECK(result.success);
+        CHECK(result.codeSize > 0);
     }
     
     TEST_CASE("String literals") {
@@ -478,6 +498,109 @@ TEST_SUITE("Compiler - TDD: Unimplemented Features (Should Fail)") {
         // Currently will compile (no type checking)
         // Once type checking implemented, should fail with semantic error
         // CHECK_FALSE(result.success); // TDD: Expect failure once type checking added
+    }
+}
+
+TEST_SUITE("Compiler - New Features: Assignments, If/Else, Function Calls") {
+    TEST_CASE("Parse assignment statement") {
+        std::string source = "func test():\n    var x = 5\n    x = 10\n    return x\n";
+        auto result = compileGDScript(source);
+        
+        CHECK(result.success);
+        CHECK(result.ast != nullptr);
+        CHECK(result.codeSize > 0);
+    }
+    
+    TEST_CASE("Parse Unicode identifier (UTF-8)") {
+        // GDScript supports Unicode in identifiers
+        // Regular string literals in UTF-8 source files contain UTF-8 bytes
+        // If source file is saved as UTF-8, this will work correctly
+        std::string source = "func テスト():\n    return 42\n"; // Japanese: "tesuto" (test)
+        auto result = compileGDScript(source);
+        
+        CHECK(result.success);
+        CHECK(result.ast != nullptr);
+        if (result.ast && result.ast->functions.size() > 0) {
+            // Function name should be UTF-8 encoded
+            CHECK(result.ast->functions[0]->name == "テスト");
+        }
+    }
+    
+    TEST_CASE("Parse Unicode string literal (UTF-8)") {
+        // String literals can contain Unicode characters
+        // Regular string literals in UTF-8 source files contain UTF-8 bytes
+        std::string source = "func test():\n    return \"こんにちは\"\n"; // Japanese: "konnichiwa" (hello)
+        auto result = compileGDScript(source);
+        
+        // Should parse successfully (codegen for strings is stubbed)
+        CHECK(result.success);
+        CHECK(result.ast != nullptr);
+    }
+    
+    TEST_CASE("Parse if/else statement") {
+        std::string source = "func test():\n    if 5 > 3:\n        return 1\n    else:\n        return 0\n";
+        auto result = compileGDScript(source);
+        
+        CHECK(result.success);
+        CHECK(result.ast != nullptr);
+        CHECK(result.codeSize > 0);
+    }
+    
+    TEST_CASE("Parse if/elif/else statement") {
+        std::string source = 
+            "func test():\n"
+            "    if 5 > 10:\n"
+            "        return 1\n"
+            "    elif 5 > 3:\n"
+            "        return 2\n"
+            "    else:\n"
+            "        return 0\n";
+        auto result = compileGDScript(source);
+        
+        CHECK(result.success);
+        CHECK(result.ast != nullptr);
+        CHECK(result.codeSize > 0);
+    }
+    
+    TEST_CASE("Parse function call") {
+        std::string source = "func test():\n    return func_name()\n";
+        auto result = compileGDScript(source);
+        
+        CHECK(result.success);
+        CHECK(result.ast != nullptr);
+        CHECK(result.codeSize > 0);
+    }
+    
+    TEST_CASE("Parse function call with arguments") {
+        std::string source = "func test():\n    return add(1, 2)\n";
+        auto result = compileGDScript(source);
+        
+        // Should parse (arguments parsing is stubbed for now)
+        CHECK(result.success);
+        CHECK(result.ast != nullptr);
+    }
+    
+    TEST_CASE("Parse assignment with expression") {
+        std::string source = "func test():\n    var x = 5\n    x = x + 1\n    return x\n";
+        auto result = compileGDScript(source);
+        
+        CHECK(result.success);
+        CHECK(result.ast != nullptr);
+        CHECK(result.codeSize > 0);
+    }
+    
+    TEST_CASE("Parse if statement with assignment") {
+        std::string source = 
+            "func test():\n"
+            "    var x = 0\n"
+            "    if 5 > 3:\n"
+            "        x = 10\n"
+            "    return x\n";
+        auto result = compileGDScript(source);
+        
+        CHECK(result.success);
+        CHECK(result.ast != nullptr);
+        CHECK(result.codeSize > 0);
     }
 }
 
@@ -550,6 +673,59 @@ TEST_SUITE("End-to-End Execution") {
         // Execution test will be added once parameter passing is implemented
         CHECK(result.codeSize > 0);
         CHECK(!result.code.empty());
+    }
+    
+    TEST_CASE("Execute if/else statement - true branch") {
+        std::string source = "func test():\n    if 5 > 3:\n        return 1\n    else:\n        return 0\n";
+        auto result = compileGDScript(source);
+        
+        REQUIRE(result.success);
+        REQUIRE(result.codeSize > 0);
+        
+        // Execute and verify (should return 1 since 5 > 3 is true)
+        int64_t actual = execute_generated_code(result.get_code_ptr(), result.codeSize);
+        CHECK(actual == 1);
+    }
+    
+    TEST_CASE("Execute if/else statement - false branch") {
+        std::string source = "func test():\n    if 3 > 5:\n        return 1\n    else:\n        return 0\n";
+        auto result = compileGDScript(source);
+        
+        REQUIRE(result.success);
+        REQUIRE(result.codeSize > 0);
+        
+        // Execute and verify (should return 0 since 3 > 5 is false)
+        int64_t actual = execute_generated_code(result.get_code_ptr(), result.codeSize);
+        CHECK(actual == 0);
+    }
+    
+    TEST_CASE("Execute assignment statement") {
+        std::string source = "func test():\n    var x = 5\n    x = 10\n    return x\n";
+        auto result = compileGDScript(source);
+        
+        REQUIRE(result.success);
+        REQUIRE(result.codeSize > 0);
+        
+        // Execute and verify (should return 10 after assignment)
+        int64_t actual = execute_generated_code(result.get_code_ptr(), result.codeSize);
+        CHECK(actual == 10);
+    }
+    
+    TEST_CASE("Execute if with assignment") {
+        std::string source = 
+            "func test():\n"
+            "    var x = 0\n"
+            "    if 5 > 3:\n"
+            "        x = 10\n"
+            "    return x\n";
+        auto result = compileGDScript(source);
+        
+        REQUIRE(result.success);
+        REQUIRE(result.codeSize > 0);
+        
+        // Execute and verify (should return 10 after assignment in if branch)
+        int64_t actual = execute_generated_code(result.get_code_ptr(), result.codeSize);
+        CHECK(actual == 10);
     }
 }
 
