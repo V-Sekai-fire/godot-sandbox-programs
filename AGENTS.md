@@ -61,6 +61,277 @@ GDScript Source Code
 
 **Decision**: Continue with cpp-peglib for now, but improve error handling and reduce workarounds. Re-evaluate if parser complexity grows significantly.
 
+#### Godot Sandbox Calling Convention
+
+**Current State**: Generated assembly functions return `int64_t` in register `a0`, but Godot expects `Variant` (C++ class).
+
+**Problem**: 
+- Generated RISC-V code follows standard RISC-V 64 Linux ABI (returns int64 in a0)
+- Godot API expects `Variant(*)()` function signature
+- Need to bridge between assembly (guest) and C++ (host)
+
+**Solution**: C++ Wrapper Function (Recommended)
+- Create C++ wrapper functions that call generated assembly
+- Wrapper converts int64 result to Variant
+- Register wrappers with `ADD_API_FUNCTION`
+
+**Implementation Approach**:
+1. **Function Registry**: Track generated function addresses by name
+2. **Wrapper Generation**: Create C++ lambda wrappers for each compiled function
+3. **Assembly Call Helper**: Helper function to call assembly and get int64 result
+4. **Variant Conversion**: Convert int64 → Variant in wrapper
+
+**Flow**:
+```
+GDScript → Callable → C++ Wrapper → Generated Assembly → int64 → Variant → GDScript
+```
+
+**Future Considerations**:
+- For functions with parameters: May need syscall/helper approach
+- For complex return types: May need direct Variant construction in assembly
+- Function registry needed for inter-function calls
+
+## Architectural Improvements Needed
+
+### 1. Error Handling and Reporting
+
+**Current State**: Basic error messages, no structured error system.
+
+**Improvements Needed**:
+- **Structured Error Types**: Create error hierarchy (ParseError, CompileError, RuntimeError)
+- **Error Context**: Include source location (line/column) in all errors
+- **Error Collection**: Support multiple errors per compilation (don't stop at first error)
+- **Error Formatting**: User-friendly error messages with source code snippets
+- **Error Recovery**: Continue parsing after errors to find more issues
+
+**Implementation**:
+```cpp
+class CompilationError {
+    enum class ErrorType { Parse, Semantic, Codegen };
+    ErrorType type;
+    std::string message;
+    SourceLocation location;
+    std::string context; // Source code snippet
+};
+```
+
+### 2. Memory Management
+
+**Current State**: `mmap` allocations in `main.cpp` are not tracked or cleaned up.
+
+**Improvements Needed**:
+- **Memory Tracking**: Track all executable memory allocations
+- **Cleanup Mechanism**: Provide way to free allocated memory
+- **Memory Pool**: Consider memory pool for code generation
+- **Buffer Management**: Handle buffer growth in emitter (currently fixed 8KB)
+
+**Implementation**:
+- Add `CodeMemoryManager` class to track and manage executable memory
+- Implement RAII wrapper for executable memory
+- Add buffer growth strategy in `ASTToRISCVEmitter`
+
+### 3. Code Organization and Cleanup
+
+**Current State**: Legacy files exist but are not used:
+- `ast_to_ir.cpp/h` (MLIR-based, deprecated)
+- `ast_to_riscv.cpp/h` (old implementation?)
+- `mlir/` directory (MLIR integration, deprecated)
+
+**Improvements Needed**:
+- **Remove or Document**: Either remove legacy files or clearly mark as deprecated
+- **Consolidate**: Ensure only one code generation path exists
+- **Clear Naming**: Use consistent naming (e.g., `ast_to_riscv_biscuit` is clear)
+
+**Action**: Create cleanup task to remove unused files or move to `deprecated/` directory.
+
+### 4. Visitor Pattern for AST Traversal
+
+**Current State**: Emitter uses switch statements on node types.
+
+**Improvements Needed**:
+- **AST Visitor Pattern**: Implement visitor pattern for cleaner code generation
+- **Separation of Concerns**: Separate different concerns (codegen, optimization, analysis)
+- **Extensibility**: Easier to add new node types and operations
+
+**Benefits**:
+- Cleaner code organization
+- Easier to add optimizations
+- Better separation between AST and code generation
+- Type-safe node handling
+
+**Implementation**:
+```cpp
+class ASTVisitor {
+    virtual void visitProgram(ProgramNode* node) = 0;
+    virtual void visitFunction(FunctionNode* node) = 0;
+    // ... etc
+};
+
+class CodegenVisitor : public ASTVisitor {
+    // Code generation logic
+};
+```
+
+### 5. Symbol Table and Name Resolution
+
+**Current State**: No symbol table - variables tracked by name in emitter.
+
+**Improvements Needed**:
+- **Symbol Table**: Implement proper symbol table for scoping
+- **Name Resolution**: Resolve identifiers to symbols (variables, functions, etc.)
+- **Scope Management**: Track variable scopes (function, block, etc.)
+- **Type Information**: Store type information in symbol table
+
+**Benefits**:
+- Proper scoping rules
+- Better error messages (undefined variable, etc.)
+- Type checking support
+- Function call resolution
+
+**Implementation**:
+```cpp
+class SymbolTable {
+    struct Symbol {
+        std::string name;
+        Type type;
+        int stackOffset;
+        Scope scope;
+    };
+    std::vector<Scope> scopes; // Stack of scopes
+};
+```
+
+### 6. Type System
+
+**Current State**: All values default to 64-bit integers.
+
+**Improvements Needed**:
+- **Type Representation**: Define type system (int, float, string, bool, etc.)
+- **Type Inference**: Infer types from literals and operations
+- **Type Checking**: Validate type compatibility
+- **Type Annotations**: Support GDScript type hints
+
+**Implementation**:
+```cpp
+class Type {
+    enum class Kind { Int, Float, String, Bool, Void, Unknown };
+    Kind kind;
+    // ... type information
+};
+```
+
+### 7. Multi-Pass Compilation
+
+**Current State**: Single-pass code generation (AST → RISC-V).
+
+**Improvements Needed**:
+- **Analysis Pass**: Type checking, symbol resolution
+- **Optimization Pass**: Dead code elimination, constant folding, etc.
+- **Code Generation Pass**: Generate RISC-V code
+- **Validation Pass**: Verify generated code
+
+**Benefits**:
+- Better error detection
+- Optimization opportunities
+- Cleaner separation of concerns
+- Easier debugging
+
+**Architecture**:
+```
+AST → [Analysis] → [Optimization] → [Code Generation] → RISC-V
+```
+
+### 8. Testing Architecture
+
+**Current State**: Basic unit tests, no integration testing framework.
+
+**Improvements Needed**:
+- **Integration Test Framework**: Test full compilation pipeline
+- **Golden File Testing**: Compare generated code against expected output
+- **Property-Based Testing**: Test with random GDScript samples
+- **Performance Testing**: Benchmark compilation and execution
+
+**Implementation**:
+- Create `CompilerTest` framework
+- Add golden file comparison for generated RISC-V code
+- Integrate with godot-dodo dataset for property testing
+
+### 9. Code Generation Strategy
+
+**Current State**: Stack size calculated before body emission, may need adjustment.
+
+**Improvements Needed**:
+- **Two-Pass Code Generation**: 
+  - Pass 1: Calculate stack size, register needs
+  - Pass 2: Generate code with known sizes
+- **Or Dynamic Stack Adjustment**: Adjust stack size during generation
+- **Label Management**: Proper label generation for control flow
+
+**Current Issue**: Stack size calculated in prologue but may grow during body emission.
+
+### 10. Documentation and Diagrams
+
+**Current State**: Text-based architecture description.
+
+**Improvements Needed**:
+- **Architecture Diagrams**: Visual representation of compilation pipeline
+- **Data Flow Diagrams**: Show how data flows through compiler
+- **Component Diagrams**: Show relationships between components
+- **Sequence Diagrams**: Show compilation process for example code
+
+**Tools**: Consider Mermaid diagrams in markdown or separate diagram files.
+
+### 11. Configuration and Options
+
+**Current State**: No configuration system.
+
+**Improvements Needed**:
+- **Compiler Options**: Optimization levels, debug info, etc.
+- **Target Configuration**: RISC-V variants, extensions
+- **Output Format**: Machine code, assembly text, or both
+
+**Implementation**:
+```cpp
+struct CompilerOptions {
+    bool optimize = false;
+    bool debugInfo = false;
+    RISCVTarget target = RISCVTarget::RV64GC;
+    OutputFormat output = OutputFormat::MachineCode;
+};
+```
+
+### 12. Function Call Support Architecture
+
+**Current State**: Function calls not implemented.
+
+**Improvements Needed**:
+- **Function Registry**: Track compiled functions
+- **Calling Convention**: Standardize function call protocol
+- **Function Lookup**: Resolve function names to addresses
+- **Inter-Function Calls**: Support calling other compiled functions
+
+**Implementation**:
+- Add `FunctionRegistry` to track compiled functions
+- Implement function call code generation
+- Support both internal and external function calls
+
+## Priority Order for Architectural Improvements
+
+1. **High Priority** (Critical for functionality):
+   - Memory management (leak prevention)
+   - Error handling (better user experience)
+   - Code organization cleanup (reduce confusion)
+
+2. **Medium Priority** (Improves code quality):
+   - Visitor pattern (better code organization)
+   - Symbol table (proper scoping)
+   - Type system (type safety)
+
+3. **Low Priority** (Nice to have):
+   - Multi-pass compilation (optimization)
+   - Testing architecture (quality assurance)
+   - Documentation diagrams (understanding)
+
 ## Current Implementation Status
 
 ### ✅ Completed Components
