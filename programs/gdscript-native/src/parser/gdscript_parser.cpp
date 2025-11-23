@@ -458,8 +458,38 @@ std::unique_ptr<ForStatement> GDScriptParser::parse_for_statement() {
 std::unique_ptr<ExpressionNode> GDScriptParser::parse_expression() {
     // Check for assignment in expression context (for assignment statements)
     // This allows "identifier = expr" to be parsed as an assignment expression
-    // But we handle assignment at statement level, so just parse equality here
-    return parse_equality();
+    // But we handle assignment at statement level, so just parse logical_or here
+    return parse_logical_or();
+}
+
+std::unique_ptr<ExpressionNode> GDScriptParser::parse_logical_or() {
+    std::unique_ptr<ExpressionNode> expr = parse_logical_and();
+    
+    while (match(TokenType::OR)) {
+        std::unique_ptr<ExpressionNode> right = parse_logical_and();
+        std::unique_ptr<BinaryOpExpr> binop = std::make_unique<BinaryOpExpr>();
+        binop->left = std::move(expr);
+        binop->right = std::move(right);
+        binop->op = "or";
+        expr = std::move(binop);
+    }
+    
+    return expr;
+}
+
+std::unique_ptr<ExpressionNode> GDScriptParser::parse_logical_and() {
+    std::unique_ptr<ExpressionNode> expr = parse_equality();
+    
+    while (match(TokenType::AND)) {
+        std::unique_ptr<ExpressionNode> right = parse_equality();
+        std::unique_ptr<BinaryOpExpr> binop = std::make_unique<BinaryOpExpr>();
+        binop->left = std::move(expr);
+        binop->right = std::move(right);
+        binop->op = "and";
+        expr = std::move(binop);
+    }
+    
+    return expr;
 }
 
 std::unique_ptr<ExpressionNode> GDScriptParser::parse_equality() {

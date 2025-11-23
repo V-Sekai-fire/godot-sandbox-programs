@@ -181,5 +181,97 @@ func test():
         CHECK(result.success);
         CHECK(std::get<int64_t>(result.return_value) == 14); // (3*2) + (4*2) = 6 + 8 = 14
     }
+    
+    TEST_CASE("11. Unary operators - negation") {
+        std::string source = R"(func test():
+    return -5
+)";
+        GDScriptParser parser;
+        auto ast = parser.parse(source);
+        REQUIRE(ast != nullptr);
+        
+        ASTInterpreter interpreter;
+        auto result = interpreter.execute(ast.get());
+        
+        CHECK(result.success);
+        CHECK(std::get<int64_t>(result.return_value) == -5);
+    }
+    
+    TEST_CASE("12. Unary operators - logical not") {
+        std::string source = R"(func test():
+    return !0
+)";
+        GDScriptParser parser;
+        auto ast = parser.parse(source);
+        REQUIRE(ast != nullptr);
+        
+        ASTInterpreter interpreter;
+        auto result = interpreter.execute(ast.get());
+        
+        CHECK(result.success);
+        CHECK(std::get<int64_t>(result.return_value) == 1); // !0 = true = 1
+    }
+    
+    TEST_CASE("13. Logical operators - and") {
+        std::string source = R"(func test():
+    return 5 > 3 and 10 > 5
+)";
+        GDScriptParser parser;
+        auto ast = parser.parse(source);
+        REQUIRE(ast != nullptr);
+        
+        ASTInterpreter interpreter;
+        auto result = interpreter.execute(ast.get());
+        
+        CHECK(result.success);
+        CHECK(std::get<int64_t>(result.return_value) == 1); // true and true = true
+    }
+    
+    TEST_CASE("14. Logical operators - or") {
+        std::string source = R"(func test():
+    return 5 < 3 or 10 > 5
+)";
+        GDScriptParser parser;
+        auto ast = parser.parse(source);
+        REQUIRE(ast != nullptr);
+        
+        ASTInterpreter interpreter;
+        auto result = interpreter.execute(ast.get());
+        
+        CHECK(result.success);
+        CHECK(std::get<int64_t>(result.return_value) == 1); // false or true = true
+    }
+    
+    TEST_CASE("15. Float arithmetic") {
+        std::string source = R"(func test():
+    return 3.5 + 2.5
+)";
+        GDScriptParser parser;
+        auto ast = parser.parse(source);
+        REQUIRE(ast != nullptr);
+        
+        ASTInterpreter interpreter;
+        auto result = interpreter.execute(ast.get());
+        
+        CHECK(result.success);
+        CHECK(std::holds_alternative<double>(result.return_value));
+        CHECK(std::get<double>(result.return_value) == 6.0);
+    }
+    
+    TEST_CASE("16. String concatenation") {
+        std::string source = R"(func test():
+    return "hello" + " " + "world"
+)";
+        GDScriptParser parser;
+        auto ast = parser.parse(source);
+        REQUIRE(ast != nullptr);
+        
+        ASTInterpreter interpreter;
+        auto result = interpreter.execute(ast.get());
+        
+        CHECK(result.success);
+        CHECK(std::holds_alternative<std::string>(result.return_value));
+        CHECK(std::get<std::string>(result.return_value) == "hello world");
+    }
 }
 

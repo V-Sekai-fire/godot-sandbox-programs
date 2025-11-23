@@ -42,6 +42,8 @@ private:
         const FunctionNode* function; // Current function
         const ProgramNode* program; // Program context (for function calls)
         size_t pc; // Program counter (statement index)
+        bool should_break; // Flag for break statement
+        bool should_continue; // Flag for continue statement
     };
     
     // Execution stack (for function calls)
@@ -58,6 +60,7 @@ private:
     Value _evaluate_literal(const LiteralExpr* lit);
     Value _evaluate_identifier(const IdentifierExpr* ident, Frame& frame);
     Value _evaluate_binary_op(const BinaryOpExpr* binop, Frame& frame);
+    Value _evaluate_unary_op(const UnaryOpExpr* unary, Frame& frame);
     Value _evaluate_call(const CallExpr* call, Frame& frame);
     
     // Statement executors

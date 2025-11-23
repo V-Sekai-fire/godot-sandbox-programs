@@ -43,6 +43,8 @@ private:
     
     // Expression parsing
     std::unique_ptr<ExpressionNode> parse_expression();
+    std::unique_ptr<ExpressionNode> parse_logical_or();
+    std::unique_ptr<ExpressionNode> parse_logical_and();
     std::unique_ptr<ExpressionNode> parse_equality();
     std::unique_ptr<ExpressionNode> parse_comparison();
     std::unique_ptr<ExpressionNode> parse_term();

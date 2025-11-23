@@ -47,6 +47,8 @@ ASTInterpreter::ExecutionResult ASTInterpreter::execute_function(
     frame.function = func;
     frame.program = program;
     frame.pc = 0;
+    frame.should_break = false;
+    frame.should_continue = false;
     
     // Initialize parameters as local variables
     for (size_t i = 0; i < func->parameters.size(); ++i) {
@@ -98,6 +100,9 @@ ASTInterpreter::Value ASTInterpreter::_evaluate_expression(const ExpressionNode*
         case ASTNode::NodeType::BinaryOpExpr:
             return _evaluate_binary_op(static_cast<const BinaryOpExpr*>(expr), frame);
         
+        case ASTNode::NodeType::UnaryOpExpr:
+            return _evaluate_unary_op(static_cast<const UnaryOpExpr*>(expr), frame);
+        
         case ASTNode::NodeType::CallExpr:
             return _evaluate_call(static_cast<const CallExpr*>(expr), frame);
         
@@ -133,49 +138,198 @@ ASTInterpreter::Value ASTInterpreter::_evaluate_binary_op(const BinaryOpExpr* bi
     Value left_val = _evaluate_expression(binop->left.get(), frame);
     Value right_val = _evaluate_expression(binop->right.get(), frame);
     
-    // For simplicity, convert everything to int64_t for arithmetic
-    // In a full implementation, we'd handle type promotion properly
-    int64_t left = 0;
-    int64_t right = 0;
-    
-    if (std::holds_alternative<int64_t>(left_val)) {
-        left = std::get<int64_t>(left_val);
-    } else if (std::holds_alternative<double>(left_val)) {
-        left = static_cast<int64_t>(std::get<double>(left_val));
-    } else if (std::holds_alternative<bool>(left_val)) {
-        left = std::get<bool>(left_val) ? 1 : 0;
+    // String concatenation (check first, before arithmetic)
+    if (binop->op == "+" && std::holds_alternative<std::string>(left_val) && std::holds_alternative<std::string>(right_val)) {
+        return Value{std::get<std::string>(left_val) + std::get<std::string>(right_val)};
     }
     
-    if (std::holds_alternative<int64_t>(right_val)) {
-        right = std::get<int64_t>(right_val);
-    } else if (std::holds_alternative<double>(right_val)) {
-        right = static_cast<int64_t>(std::get<double>(right_val));
-    } else if (std::holds_alternative<bool>(right_val)) {
-        right = std::get<bool>(right_val) ? 1 : 0;
+    // Handle type promotion: if either operand is float, result is float
+    // Otherwise, use int64_t for arithmetic
+    bool has_float = std::holds_alternative<double>(left_val) || std::holds_alternative<double>(right_val);
+    
+    if (has_float) {
+        // Float arithmetic
+        double left = 0.0;
+        double right = 0.0;
+        
+        if (std::holds_alternative<int64_t>(left_val)) {
+            left = static_cast<double>(std::get<int64_t>(left_val));
+        } else if (std::holds_alternative<double>(left_val)) {
+            left = std::get<double>(left_val);
+        } else if (std::holds_alternative<bool>(left_val)) {
+            left = std::get<bool>(left_val) ? 1.0 : 0.0;
+        }
+        
+        if (std::holds_alternative<int64_t>(right_val)) {
+            right = static_cast<double>(std::get<int64_t>(right_val));
+        } else if (std::holds_alternative<double>(right_val)) {
+            right = std::get<double>(right_val);
+        } else if (std::holds_alternative<bool>(right_val)) {
+            right = std::get<bool>(right_val) ? 1.0 : 0.0;
+        }
+        
+        if (binop->op == "+") {
+            return Value{left + right};
+        } else if (binop->op == "-") {
+            return Value{left - right};
+        } else if (binop->op == "*") {
+            return Value{left * right};
+        } else if (binop->op == "/") {
+            return Value{right != 0.0 ? left / right : 0.0};
+        } else if (binop->op == "%") {
+            return Value{right != 0.0 ? std::fmod(left, right) : 0.0};
+        } else if (binop->op == "==") {
+            return Value{left == right ? int64_t(1) : int64_t(0)};
+        } else if (binop->op == "!=") {
+            return Value{left != right ? int64_t(1) : int64_t(0)};
+        } else if (binop->op == "<") {
+            return Value{left < right ? int64_t(1) : int64_t(0)};
+        } else if (binop->op == ">") {
+            return Value{left > right ? int64_t(1) : int64_t(0)};
+        } else if (binop->op == "<=") {
+            return Value{left <= right ? int64_t(1) : int64_t(0)};
+        } else if (binop->op == ">=") {
+            return Value{left >= right ? int64_t(1) : int64_t(0)};
+        }
+    } else {
+        // Integer arithmetic
+        int64_t left = 0;
+        int64_t right = 0;
+        
+        if (std::holds_alternative<int64_t>(left_val)) {
+            left = std::get<int64_t>(left_val);
+        } else if (std::holds_alternative<bool>(left_val)) {
+            left = std::get<bool>(left_val) ? 1 : 0;
+        }
+        
+        if (std::holds_alternative<int64_t>(right_val)) {
+            right = std::get<int64_t>(right_val);
+        } else if (std::holds_alternative<bool>(right_val)) {
+            right = std::get<bool>(right_val) ? 1 : 0;
+        }
+        
+        if (binop->op == "+") {
+            return Value{left + right};
+        } else if (binop->op == "-") {
+            return Value{left - right};
+        } else if (binop->op == "*") {
+            return Value{left * right};
+        } else if (binop->op == "/") {
+            return Value{right != 0 ? left / right : int64_t(0)};
+        } else if (binop->op == "%") {
+            return Value{right != 0 ? left % right : int64_t(0)};
+        } else if (binop->op == "==") {
+            return Value{left == right ? int64_t(1) : int64_t(0)};
+        } else if (binop->op == "!=") {
+            return Value{left != right ? int64_t(1) : int64_t(0)};
+        } else if (binop->op == "<") {
+            return Value{left < right ? int64_t(1) : int64_t(0)};
+        } else if (binop->op == ">") {
+            return Value{left > right ? int64_t(1) : int64_t(0)};
+        } else if (binop->op == "<=") {
+            return Value{left <= right ? int64_t(1) : int64_t(0)};
+        } else if (binop->op == ">=") {
+            return Value{left >= right ? int64_t(1) : int64_t(0)};
+        }
     }
     
-    if (binop->op == "+") {
-        return Value{left + right};
-    } else if (binop->op == "-") {
-        return Value{left - right};
-    } else if (binop->op == "*") {
-        return Value{left * right};
-    } else if (binop->op == "/") {
-        return Value{right != 0 ? left / right : int64_t(0)};
-    } else if (binop->op == "%") {
-        return Value{right != 0 ? left % right : int64_t(0)};
-    } else if (binop->op == "==") {
-        return Value{left == right ? int64_t(1) : int64_t(0)};
-    } else if (binop->op == "!=") {
-        return Value{left != right ? int64_t(1) : int64_t(0)};
-    } else if (binop->op == "<") {
-        return Value{left < right ? int64_t(1) : int64_t(0)};
-    } else if (binop->op == ">") {
-        return Value{left > right ? int64_t(1) : int64_t(0)};
-    } else if (binop->op == "<=") {
-        return Value{left <= right ? int64_t(1) : int64_t(0)};
-    } else if (binop->op == ">=") {
-        return Value{left >= right ? int64_t(1) : int64_t(0)};
+    // Logical operators (short-circuit evaluation)
+    if (binop->op == "and") {
+        // Short-circuit: evaluate left first, only evaluate right if left is truthy
+        Value left_val = _evaluate_expression(binop->left.get(), frame);
+        bool left_truthy = false;
+        if (std::holds_alternative<int64_t>(left_val)) {
+            left_truthy = std::get<int64_t>(left_val) != 0;
+        } else if (std::holds_alternative<bool>(left_val)) {
+            left_truthy = std::get<bool>(left_val);
+        } else if (std::holds_alternative<double>(left_val)) {
+            left_truthy = std::get<double>(left_val) != 0.0;
+        }
+        
+        if (!left_truthy) {
+            return Value{int64_t(0)}; // Short-circuit: return false
+        }
+        
+        // Left is truthy, evaluate right
+        Value right_val = _evaluate_expression(binop->right.get(), frame);
+        bool right_truthy = false;
+        if (std::holds_alternative<int64_t>(right_val)) {
+            right_truthy = std::get<int64_t>(right_val) != 0;
+        } else if (std::holds_alternative<bool>(right_val)) {
+            right_truthy = std::get<bool>(right_val);
+        } else if (std::holds_alternative<double>(right_val)) {
+            right_truthy = std::get<double>(right_val) != 0.0;
+        }
+        
+        return Value{right_truthy ? int64_t(1) : int64_t(0)};
+    } else if (binop->op == "or") {
+        // Short-circuit: evaluate left first, only evaluate right if left is falsy
+        Value left_val = _evaluate_expression(binop->left.get(), frame);
+        bool left_truthy = false;
+        if (std::holds_alternative<int64_t>(left_val)) {
+            left_truthy = std::get<int64_t>(left_val) != 0;
+        } else if (std::holds_alternative<bool>(left_val)) {
+            left_truthy = std::get<bool>(left_val);
+        } else if (std::holds_alternative<double>(left_val)) {
+            left_truthy = std::get<double>(left_val) != 0.0;
+        }
+        
+        if (left_truthy) {
+            return Value{int64_t(1)}; // Short-circuit: return true
+        }
+        
+        // Left is falsy, evaluate right
+        Value right_val = _evaluate_expression(binop->right.get(), frame);
+        bool right_truthy = false;
+        if (std::holds_alternative<int64_t>(right_val)) {
+            right_truthy = std::get<int64_t>(right_val) != 0;
+        } else if (std::holds_alternative<bool>(right_val)) {
+            right_truthy = std::get<bool>(right_val);
+        } else if (std::holds_alternative<double>(right_val)) {
+            right_truthy = std::get<double>(right_val) != 0.0;
+        }
+        
+        return Value{right_truthy ? int64_t(1) : int64_t(0)};
+    }
+    
+    return Value{int64_t(0)};
+}
+
+ASTInterpreter::Value ASTInterpreter::_evaluate_unary_op(const UnaryOpExpr* unary, Frame& frame) {
+    if (!unary || !unary->operand) {
+        return Value{int64_t(0)};
+    }
+    
+    Value operand_val = _evaluate_expression(unary->operand.get(), frame);
+    
+    if (unary->op == "-" || unary->op == "MINUS") {
+        // Negation
+        if (std::holds_alternative<int64_t>(operand_val)) {
+            return Value{-std::get<int64_t>(operand_val)};
+        } else if (std::holds_alternative<double>(operand_val)) {
+            return Value{-std::get<double>(operand_val)};
+        } else {
+            return Value{int64_t(0)};
+        }
+    } else if (unary->op == "+" || unary->op == "PLUS") {
+        // Unary plus (no-op, but return the value)
+        return operand_val;
+    } else if (unary->op == "!" || unary->op == "not") {
+        // Logical not
+        bool truthy = false;
+        if (std::holds_alternative<int64_t>(operand_val)) {
+            truthy = std::get<int64_t>(operand_val) != 0;
+        } else if (std::holds_alternative<bool>(operand_val)) {
+            truthy = std::get<bool>(operand_val);
+        } else if (std::holds_alternative<double>(operand_val)) {
+            truthy = std::get<double>(operand_val) != 0.0;
+        } else if (std::holds_alternative<std::nullptr_t>(operand_val)) {
+            truthy = false;
+        } else if (std::holds_alternative<std::string>(operand_val)) {
+            truthy = !std::get<std::string>(operand_val).empty();
+        }
+        
+        return Value{truthy ? int64_t(0) : int64_t(1)}; // Not: true -> false (0), false -> true (1)
     }
     
     return Value{int64_t(0)};
@@ -387,12 +541,24 @@ void ASTInterpreter::_execute_for_statement(const ForStatement* for_stmt, Frame&
     
     // Execute loop: for i in range(N) means i goes from 0 to N-1
     for (int64_t i = 0; i < end_value; ++i) {
+        // Reset break/continue flags for each iteration
+        frame.should_break = false;
+        frame.should_continue = false;
+        
         // Set loop variable
         frame.variables[for_stmt->variable_name] = Value{i};
         
         // Execute loop body
         for (const std::unique_ptr<StatementNode>& stmt : for_stmt->body) {
             _execute_statement(stmt.get(), frame);
+            
+            // Check for break/continue
+            if (frame.should_break) {
+                return; // Exit loop
+            }
+            if (frame.should_continue) {
+                break; // Continue to next iteration
+            }
         }
     }
 }
@@ -402,7 +568,18 @@ void ASTInterpreter::_execute_while_statement(const WhileStatement* while_stmt, 
         return;
     }
     
-    while (true) {
+    // Safety: prevent infinite loops (max 1000000 iterations)
+    const int64_t MAX_ITERATIONS = 1000000;
+    int64_t iteration_count = 0;
+    
+    while (iteration_count < MAX_ITERATIONS) {
+        iteration_count++;
+        
+        // Reset break/continue flags for each iteration
+        frame.should_break = false;
+        frame.should_continue = false;
+        
+        // Evaluate condition
         Value cond_val = _evaluate_expression(while_stmt->condition.get(), frame);
         bool condition = false;
         
@@ -410,16 +587,30 @@ void ASTInterpreter::_execute_while_statement(const WhileStatement* while_stmt, 
             condition = std::get<int64_t>(cond_val) != 0;
         } else if (std::holds_alternative<bool>(cond_val)) {
             condition = std::get<bool>(cond_val);
+        } else if (std::holds_alternative<double>(cond_val)) {
+            condition = std::get<double>(cond_val) != 0.0;
         }
         
         if (!condition) {
-            break;
+            break; // Exit loop when condition is false
         }
         
+        // Execute loop body
         for (const std::unique_ptr<StatementNode>& stmt : while_stmt->body) {
             _execute_statement(stmt.get(), frame);
+            
+            // Check for break/continue flags (for future break/continue support)
+            if (frame.should_break) {
+                return; // Exit loop
+            }
+            if (frame.should_continue) {
+                break; // Continue to next iteration
+            }
         }
     }
+    
+    // If we hit max iterations, the loop was likely infinite
+    // This is a safety measure to prevent hangs
 }
 
 ASTInterpreter::Value ASTInterpreter::_literal_to_value(const LiteralExpr* lit) {
