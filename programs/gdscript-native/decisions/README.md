@@ -24,6 +24,7 @@ This directory contains RFC-style Architecture Decision Records (ADRs) documenti
 - [RFC 0013: Function Registry](./0013-function-registry-calling-convention.md) - Function registry and calling convention
 - [RFC 0014: Dynamic Buffer Growth](./0014-dynamic-buffer-growth.md) - Dynamic buffer growth strategy for code generation
 - [RFC 0015: AST to RISC-V Direct Compilation](./0015-ast-to-riscv-direct-compilation.md) - Direct AST to RISC-V compilation (not Godot bytecode)
+- [RFC 0016: Register Allocation Strategy](./0016-register-allocation-strategy.md) - Round-robin register allocation with stack spilling
 
 ## Format
 
