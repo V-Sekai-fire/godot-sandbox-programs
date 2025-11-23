@@ -39,14 +39,14 @@ private:
     std::vector<CodeSection> _code_sections;
     std::vector<Symbol> _symbols;
     
-    // ELF header constants
+    // ELF64 constants
     static constexpr uint8_t ELF_MAGIC[] = {0x7f, 'E', 'L', 'F'};
     static constexpr uint8_t ELF_CLASS_64 = 2;
     static constexpr uint8_t ELF_DATA_LITTLE = 1;
     static constexpr uint8_t ELF_VERSION = 1;
     static constexpr uint16_t ELF_TYPE_EXEC = 2;
-    static constexpr uint16_t ELF_MACHINE_RISCV = 243; // RISC-V
-    static constexpr uint64_t ELF_ENTRY_POINT = 0x10000; // Default entry point
+    static constexpr uint16_t ELF_MACHINE_RISCV = 243;
+    static constexpr uint64_t ELF_ENTRY_POINT = 0x10000;
     
     // Write ELF header
     void _write_elf_header(std::vector<uint8_t>& elf, size_t& offset, size_t shdr_offset, size_t num_sections, uint64_t entry_point);

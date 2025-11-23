@@ -42,70 +42,58 @@ std::vector<uint8_t> ELFGenerator::generate() {
     // Alignment is handled by p_align in program header for virtual addresses
     // But file size should match actual code size
     
-    // Calculate offsets
-    // ELF structure: p_offset=0x0, p_vaddr=0x10000, .text sh_offset=0x78, .text sh_addr=0x10078
-    size_t elf_header_size = 64; // ELF64 header
-    size_t phdr_size = 56; // ELF64 program header
-    size_t phdr_offset = elf_header_size;
-    size_t code_offset_in_file = elf_header_size + phdr_size; // Code starts after headers (120 bytes = 0x78)
+    // ELF64 header and program header sizes
+    constexpr size_t ELF_HEADER_SIZE = 64;
+    constexpr size_t PROGRAM_HEADER_SIZE = 56;
+    constexpr size_t PAGE_ALIGN = 0x1000;
     
-    // ELF segment structure: p_offset = 0x0 (segment starts at file offset 0)
-    // p_vaddr = 0x10000 (segment base virtual address)
-    // Alignment: p_offset % p_align == p_vaddr % p_align (both 0)
-    size_t p_align = 0x1000;
-    size_t p_offset = 0x0; // Like C ELF - segment starts at file offset 0
-    uint64_t p_vaddr = ELF_ENTRY_POINT; // 0x10000 - segment base
+    size_t phdr_offset = ELF_HEADER_SIZE;
+    size_t code_offset_in_file = ELF_HEADER_SIZE + PROGRAM_HEADER_SIZE; // Code starts at offset 0x78
     
-    // Section headers: null (0) + .text (1) + .shstrtab (2) = 3 sections
-    size_t shdr_size = 64; // ELF64 section header size
-    size_t num_sections = 3; // null, .text, .shstrtab
-    size_t shstrtab_size = 16; // ".text\0.shstrtab\0" = 16 bytes
+    // Program header: segment starts at file offset 0, loaded at virtual address 0x10000
+    // Alignment requirement: p_offset % p_align == p_vaddr % p_align (both 0)
+    size_t p_offset = 0x0;
+    uint64_t p_vaddr = ELF_ENTRY_POINT;
     
-    // Calculate segment size: p_filesz is aligned size that includes headers + code
+    // Section headers: null (0) + .text (1) + .shstrtab (2)
+    constexpr size_t SECTION_HEADER_SIZE = 64;
+    constexpr size_t NUM_SECTIONS = 3;
+    constexpr size_t SHSTRTAB_SIZE = 16; // ".text\0.shstrtab\0"
+    
+    // Calculate segment size: align to page boundary (includes headers + code)
     size_t segment_size = code_offset_in_file + code_size;
-    // Align to page boundary (like C ELF uses 0x1000 alignment)
-    segment_size = ((segment_size + p_align - 1) / p_align) * p_align;
+    segment_size = ((segment_size + PAGE_ALIGN - 1) / PAGE_ALIGN) * PAGE_ALIGN;
     
-    // .text section virtual address = p_vaddr + (sh_offset - p_offset)
+    // .text section virtual address: maintains relationship sh_addr - p_vaddr == sh_offset - p_offset
+    // This ensures libriscv's serialize_execute_segment() places code correctly
     uint64_t text_sh_addr = p_vaddr + (code_offset_in_file - p_offset);
-    
-    // Entry point at start of .text section
     uint64_t entry_point = text_sh_addr;
     
-    // p_filesz: aligned segment size (includes headers + code)
-    size_t p_filesz = segment_size;
+    // Program header sizes
+    size_t p_filesz = segment_size;  // File size: aligned segment (includes headers)
+    size_t p_memsz = code_size;      // Memory size: actual code only
     
-    // p_memsz: actual code size in memory
-    size_t p_memsz = code_size;
-    
-    // Calculate layout: segment at p_offset=0, then shstrtab, then section headers
+    // File layout: segment (headers + code) -> shstrtab -> section headers
     size_t shstrtab_offset = segment_size;
-    size_t shdr_offset = shstrtab_offset + shstrtab_size;
-    size_t total_size = shdr_offset + (num_sections * shdr_size);
+    size_t shdr_offset = shstrtab_offset + SHSTRTAB_SIZE;
+    size_t total_size = shdr_offset + (NUM_SECTIONS * SECTION_HEADER_SIZE);
     
     std::vector<uint8_t> elf(total_size, 0);
     size_t offset = 0;
     
-    // Write ELF header (at file offset 0, within the segment)
-    _write_elf_header(elf, offset, shdr_offset, num_sections, entry_point);
-    
-    // Write program header (at file offset 64, within the segment)
+    // Write ELF components in order
+    _write_elf_header(elf, offset, shdr_offset, NUM_SECTIONS, entry_point);
     _write_program_headers(elf, phdr_offset, p_filesz, p_memsz, p_offset, p_vaddr);
     
-    // Write code sections after headers (at code_offset_in_file = 120)
+    // Write code sections at code_offset_in_file
     offset = code_offset_in_file;
     for (const auto& section : _code_sections) {
         std::memcpy(elf.data() + offset, section.data.data(), section.data.size());
         offset += section.data.size();
     }
     
-    // Write string table for section names
     _write_string_table(elf, shstrtab_offset);
-    
-    // Write section headers
-    // .text sh_addr = p_vaddr + (sh_offset - p_offset)
-    // This ensures serialize_execute_segment() places code at the correct virtual address
-    _write_section_headers(elf, shdr_offset, code_offset_in_file, code_size, shstrtab_offset, shstrtab_size, text_sh_addr);
+    _write_section_headers(elf, shdr_offset, code_offset_in_file, code_size, shstrtab_offset, SHSTRTAB_SIZE, text_sh_addr);
     
     return elf;
 }
@@ -196,28 +184,18 @@ void ELFGenerator::_write_program_headers(std::vector<uint8_t>& elf, size_t& off
     *reinterpret_cast<uint32_t*>(elf.data() + offset) = 0x5; // PF_R | PF_X
     offset += 4;
     
-    // p_offset = offset in file (must be aligned: p_offset % p_align == p_vaddr % p_align)
-    *reinterpret_cast<uint64_t*>(elf.data() + offset) = p_offset;
+    // Program header fields (PT_LOAD segment)
+    *reinterpret_cast<uint64_t*>(elf.data() + offset) = p_offset;  // File offset
     offset += 8;
-    
-    // p_vaddr = virtual address (adjusted for alignment to match p_offset)
-    *reinterpret_cast<uint64_t*>(elf.data() + offset) = p_vaddr;
+    *reinterpret_cast<uint64_t*>(elf.data() + offset) = p_vaddr;  // Virtual address
     offset += 8;
-    
-    // p_paddr = physical address (same as virtual)
-    *reinterpret_cast<uint64_t*>(elf.data() + offset) = p_vaddr;
+    *reinterpret_cast<uint64_t*>(elf.data() + offset) = p_vaddr;  // Physical address (same as virtual)
     offset += 8;
-    
-    // p_filesz = size in file (aligned segment size)
-    *reinterpret_cast<uint64_t*>(elf.data() + offset) = p_filesz;
+    *reinterpret_cast<uint64_t*>(elf.data() + offset) = p_filesz;  // File size (aligned segment)
     offset += 8;
-    
-    // p_memsz = size in memory (actual code size)
-    *reinterpret_cast<uint64_t*>(elf.data() + offset) = p_memsz;
+    *reinterpret_cast<uint64_t*>(elf.data() + offset) = p_memsz;  // Memory size (code only)
     offset += 8;
-    
-    // p_align = alignment (4KB)
-    *reinterpret_cast<uint64_t*>(elf.data() + offset) = 0x1000;
+    *reinterpret_cast<uint64_t*>(elf.data() + offset) = 0x1000;   // Alignment (4KB page)
     offset += 8;
 }
 
@@ -253,9 +231,9 @@ void ELFGenerator::_write_section_headers(std::vector<uint8_t>& elf, size_t shdr
     offset += 4;
     *reinterpret_cast<uint64_t*>(elf.data() + offset) = 0x6; // sh_flags = SHF_ALLOC | SHF_EXECINSTR
     offset += 8;
-    *reinterpret_cast<uint64_t*>(elf.data() + offset) = text_vaddr; // sh_addr = p_vaddr (segment base, not entry point)
+    *reinterpret_cast<uint64_t*>(elf.data() + offset) = text_vaddr;  // sh_addr: virtual address
     offset += 8;
-    *reinterpret_cast<uint64_t*>(elf.data() + offset) = code_offset; // sh_offset = code offset
+    *reinterpret_cast<uint64_t*>(elf.data() + offset) = code_offset; // sh_offset: file offset
     offset += 8;
     *reinterpret_cast<uint64_t*>(elf.data() + offset) = code_size; // sh_size = code size
     offset += 8;

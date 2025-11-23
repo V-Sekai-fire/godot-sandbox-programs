@@ -23,6 +23,7 @@ Makefile
 
 # Test outputs and executables
 *.elf
+*.bin
 test_output/
 **/test_output/
 test_elf_gen
@@ -32,6 +33,19 @@ test_page_check
 test_reset_check
 test_exec_segment
 test_debug_simulate
+
+# Debug and temporary files
+*.log
+*.tmp
+gdb_commands.txt
+*.dSYM/
+core
+core.*
+
+# RISC-V toolchain outputs
+*.riscv
+*.s
+*.dump
 
 # IDE files
 .idea/

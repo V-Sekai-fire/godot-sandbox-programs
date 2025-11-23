@@ -10,30 +10,22 @@ std::pair<const uint8_t*, size_t> ASTToRISCVEmitter::emit(const ProgramNode* pro
         return {nullptr, 0};
     }
     
-    // Initialize biscuit assembler with our buffer
-    // Biscuit assembler takes buffer and size, similar to AsmJit
+    // Initialize biscuit assembler (direct machine code generation, similar to AsmJit)
     _assembler = std::make_unique<biscuit::Assembler>(_code_buffer.data(), _code_buffer.size());
     
-    // Emit all functions
+    // Emit all functions sequentially
     for (const auto& func : program->functions) {
         _emit_function(func.get());
         
-        // Check if buffer needs to grow
+        // Check buffer capacity (grow if >90% full)
         size_t currentOffset = static_cast<size_t>(_assembler->GetCodeBuffer().GetCursorOffset());
-        if (currentOffset >= _code_buffer.size() * 0.9) { // 90% full
-            // Grow buffer by 2x
-            size_t oldSize = _code_buffer.size();
-            size_t newSize = _code_buffer.size() * 2;
-            _code_buffer.resize(newSize);
-            
-            // Note: Growing buffer with existing assembler is complex
-            // For now, we'll allocate a large enough buffer initially
-            // TODO: Implement proper buffer growth strategy
+        if (currentOffset >= _code_buffer.size() * 0.9) {
+            // Buffer growth requires recreating assembler, so we allocate large initial buffer
+            // TODO: Implement proper buffer growth strategy if needed
         }
     }
     
-    // Get the actual size of generated code
-    // Biscuit writes directly to buffer, GetCursorOffset() returns current position
+    // Get final code size
     size_t codeSize = static_cast<size_t>(_assembler->GetCodeBuffer().GetCursorOffset());
     
     _assembler.reset();
@@ -49,18 +41,13 @@ void ASTToRISCVEmitter::_emit_function(const FunctionNode* func) {
     _current_function = func;
     _reset_function_state();
     
-    // RISC-V 64 Linux function prologue
-    // Stack frame layout (RISC-V 64 ABI):
+    // RISC-V 64 Linux ABI stack frame layout:
     // - sp+0: saved frame pointer (s0/fp)
     // - sp+8: saved return address (ra)
-    // - sp+16+: local variables and spilled registers
+    // - sp+16+: parameters and local variables
     int paramStackSize = static_cast<int>(func->parameters.size() * 8);
-    // Start with minimum: saved regs (16) + parameters
-    // Will grow dynamically as variables are allocated
-    int initialStackSize = 16 + paramStackSize;
-    // Allocate extra space for local variables (conservative estimate)
-    // We'll track actual usage and adjust in epilogue
-    int estimatedLocalVars = 64; // Estimate 8 local variables (8 bytes each)
+    int initialStackSize = 16 + paramStackSize;  // Saved regs + parameters
+    int estimatedLocalVars = 64;                 // Conservative estimate for locals
     int stackSize = initialStackSize + estimatedLocalVars;
     _current_function_stack_size = stackSize;
     
@@ -70,25 +57,19 @@ void ASTToRISCVEmitter::_emit_function(const FunctionNode* func) {
     _assembler->SD(biscuit::s0, stackSize - 16, biscuit::sp);
     _assembler->ADDI(biscuit::s0, biscuit::sp, stackSize);
     
-    // RISC-V 64 Linux calling convention:
-    // - Arguments: a0-a7 (x10-x17) for first 8 arguments
-    // - Return value: a0 (x10)
-    // Store function arguments from registers to stack slots
-    biscuit::GPR argRegs[] = {
+    // RISC-V 64 Linux calling convention: arguments in a0-a7, return in a0
+    // Store incoming arguments from registers to stack for variable access
+    static constexpr biscuit::GPR argRegs[] = {
         biscuit::a0, biscuit::a1, biscuit::a2, biscuit::a3,
         biscuit::a4, biscuit::a5, biscuit::a6, biscuit::a7
     };
     
     for (size_t i = 0; i < func->parameters.size() && i < 8; ++i) {
-        const auto& param = func->parameters[i];
-        std::string varName = param.first;
-        // Arguments arrive in a0-a7, store them to stack for variable access
-        int offset = 16 + static_cast<int>(i * 8); // Start after saved registers
+        int offset = 16 + static_cast<int>(i * 8); // After saved registers
         _assembler->SD(argRegs[i], offset, biscuit::sp);
-        _var_to_stack_offset[varName] = offset;
+        _var_to_stack_offset[func->parameters[i].first] = offset;
     }
     
-    // Update _stack_offset to account for parameters
     _stack_offset = static_cast<int>(func->parameters.size() * 8);
     
     // Emit function body
@@ -96,17 +77,14 @@ void ASTToRISCVEmitter::_emit_function(const FunctionNode* func) {
         _emit_statement(stmt.get());
     }
     
-    // Function epilogue (fallback if no explicit return)
-    // RISC-V 64 Linux: return value should be in a0
-    _assembler->LI(biscuit::a0, 0);  // Default return value 0
+    // Function epilogue: restore saved registers and return
+    // Default return value is 0 if no explicit return statement
+    _assembler->LI(biscuit::a0, 0);
     
-    // Calculate actual stack size needed (same logic as _emit_return)
-    int epilogueParamStackSize = static_cast<int>(func->parameters.size() * 8);
-    int actualStackNeeded = 16 + epilogueParamStackSize;
-    if (_stack_offset > epilogueParamStackSize) {
-        actualStackNeeded = 16 + _stack_offset;
-    }
-    int actualStackSize = (actualStackNeeded > _current_function_stack_size) ? actualStackNeeded : _current_function_stack_size;
+    // Calculate actual stack size (may have grown during function body)
+    int paramStackSize = static_cast<int>(func->parameters.size() * 8);
+    int actualStackNeeded = 16 + std::max(_stack_offset, paramStackSize);
+    int actualStackSize = std::max(actualStackNeeded, _current_function_stack_size);
     
     _assembler->LD(biscuit::ra, actualStackSize - 8, biscuit::sp);
     _assembler->LD(biscuit::s0, actualStackSize - 16, biscuit::sp);

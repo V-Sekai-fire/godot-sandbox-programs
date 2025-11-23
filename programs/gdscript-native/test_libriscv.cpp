@@ -1,5 +1,4 @@
 // Test program to load and execute ELF file using libriscv
-// Following the same pattern as Godot sandbox
 #include <libriscv/machine.hpp>
 #include <libriscv/rsp_server.hpp>
 #include <libriscv/debug.hpp>
@@ -7,6 +6,7 @@
 #include <vector>
 #include <iostream>
 #include <cstring>
+#include <cstdlib>
 
 using namespace riscv;
 
@@ -38,12 +38,15 @@ int main(int argc, char* argv[]) {
     std::cout << "Loaded ELF file: " << elf_path << " (" << size << " bytes)\n";
     
     try {
-        // Create machine options (like Godot sandbox does)
+        // Configure machine options
         MachineOptions<RISCV64> options;
         options.memory_max = 64 << 20; // 64 MiB
-        options.allow_write_exec_segment = true; // Allow executable segments
-        options.protect_segments = false; // Don't enforce strict segment protection
-        options.verbose_loader = true; // Enable verbose logging for debugging
+        options.allow_write_exec_segment = true;
+        options.protect_segments = false;
+        
+        // Enable verbose logging if DEBUG environment variable is set
+        const char* debug_env = std::getenv("DEBUG");
+        options.verbose_loader = (debug_env != nullptr && std::string(debug_env) == "1");
         
         // Create RISC-V machine with binary (using string_view, like Godot sandbox)
         std::string_view binary_view{reinterpret_cast<const char*>(binary.data()), binary.size()};
@@ -59,26 +62,32 @@ int main(int argc, char* argv[]) {
         
         std::cout << "Linux environment setup complete\n";
         
-        // Set instruction limit
         machine.set_max_instructions(1'000'000);
         
-        // Use built-in debug facilities (works without GDB)
-        std::cout << "\n=== Using Built-in Debugger ===\n";
-        riscv::DebugMachine debug { machine };
-        debug.verbose_instructions = true; // Print all instructions
-        debug.print_and_pause(); // Break immediately
+        // Use debugger if DEBUG=1, otherwise run normally
+        const char* debug_env = std::getenv("DEBUG");
+        bool use_debugger = (debug_env != nullptr && std::string(debug_env) == "1");
         
-        // Run the program with debugging
-        std::cout << "Starting execution with debug output...\n";
-        try {
-            debug.simulate();
-        } catch (riscv::MachineException& me) {
-            std::cerr << ">>> Machine exception " << me.type() << ": " << me.what() 
-                      << " (data: 0x" << std::hex << me.data() << std::dec << ")\n";
+        if (use_debugger) {
+            std::cout << "\n=== Using Built-in Debugger ===\n";
+            riscv::DebugMachine debug{machine};
+            debug.verbose_instructions = true;
             debug.print_and_pause();
-        } catch (std::exception& e) {
-            std::cerr << ">>> General exception: " << e.what() << "\n";
-            debug.print_and_pause();
+            
+            std::cout << "Starting execution with debug output...\n";
+            try {
+                debug.simulate();
+            } catch (riscv::MachineException& me) {
+                std::cerr << ">>> Machine exception " << me.type() << ": " << me.what() 
+                          << " (data: 0x" << std::hex << me.data() << std::dec << ")\n";
+                debug.print_and_pause();
+            } catch (std::exception& e) {
+                std::cerr << ">>> General exception: " << e.what() << "\n";
+                debug.print_and_pause();
+            }
+        } else {
+            std::cout << "Starting execution...\n";
+            machine.simulate();
         }
         
         // Get exit code (from a0 register, which is register 10)
