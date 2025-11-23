@@ -5,16 +5,9 @@ project(gdscript-native)
 # Using biscuit for RISC-V code generation (similar to AsmJit in BEAM JIT)
 
 # Add biscuit library (RISC-V assembler, similar to AsmJit)
-include(FetchContent)
-FetchContent_Declare(
-	biscuit
-	GIT_REPOSITORY https://github.com/lioncash/biscuit.git
-	GIT_TAG main
-)
-FetchContent_MakeAvailable(biscuit)
-
+# Biscuit is available as a git subrepo in thirdparty/biscuit
 # Biscuit is header-only, just need to include the directory
-target_include_directories(gdscript_native PRIVATE ${biscuit_SOURCE_DIR}/include)
+target_include_directories(gdscript_native PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../thirdparty/biscuit/include)
 
 # Build the gdscript-native sandbox program
 add_ci_program(gdscript_native
