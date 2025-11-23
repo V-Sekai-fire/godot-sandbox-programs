@@ -23,6 +23,10 @@ private:
     };
     ProgramData last_program_data;
     
+    // Indentation tracking for parsing
+    std::vector<int> indent_stack; // Stack of indentation levels
+    int current_indent; // Current indentation level
+    
     // Error collection
     ErrorCollection _errors;
     

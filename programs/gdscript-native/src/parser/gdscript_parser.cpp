@@ -87,12 +87,16 @@ static int count_indent(const std::string& line) {
 }
 
 // Pre-process source to convert indentation to explicit block markers
+// This is necessary because PEG parsers don't natively support indentation-sensitive syntax
+// The standard approach for Python-like languages is to convert indentation to explicit markers
 static std::string preprocess_indentation(const std::string& source) {
     std::istringstream iss(source);
     std::ostringstream oss;
     std::vector<int> indent_stack = {0};
     std::string line;
     bool first_line = true;
+    bool expecting_block = false;
+    int block_indent = 0;
     
     while (std::getline(iss, line)) {
         // Count leading spaces/tabs
@@ -113,12 +117,26 @@ static std::string preprocess_indentation(const std::string& source) {
         
         if (!trimmed.empty() && trimmed.back() == ':') {
             // This is a block start (if, elif, else, for, while, match, func, etc.)
-            oss << line << "\n"; // Keep original line
+            // Remove trailing colon and whitespace, add it back with opening brace
+            std::string line_without_colon = trimmed;
+            if (!line_without_colon.empty()) {
+                line_without_colon.pop_back(); // Remove ':'
+            }
+            // Trim trailing whitespace from line_without_colon
+            while (!line_without_colon.empty() && (line_without_colon.back() == ' ' || line_without_colon.back() == '\t')) {
+                line_without_colon.pop_back();
+            }
+            oss << line_without_colon << ":\n"; // Keep original line structure
+            // Add opening brace on same line or next line (grammar allows whitespace)
+            oss << "{\n";
             // Next line should be indented more
+            block_indent = indent;
             indent_stack.push_back(indent + 4); // Expect at least 4 spaces more
+            expecting_block = true;
         } else {
-            // Regular line
+            // Regular line - preserve indentation
             oss << line << "\n";
+            expecting_block = false;
         }
         first_line = false;
     }
@@ -132,31 +150,30 @@ static std::string preprocess_indentation(const std::string& source) {
     return oss.str();
 }
 
-// Basic GDScript grammar (PEG syntax)
-// Starting with simple subset: functions, returns, integer literals, identifiers
-// Note: GDScript uses indentation for blocks, but for now we'll use newlines
-// TODO: Add proper indentation handling
+// GDScript grammar - indentation handled via preprocessing to braces
+// This is the standard approach for indentation-sensitive languages with PEG parsers
+// The preprocessing step converts indentation to explicit block markers ({})
 static const char* gdscript_grammar = R"(
     Program         <- (Function / Statement)*
     
-    Function        <- 'func' _ Identifier _ '(' _ Parameters? _ ')' _ (':' _ ReturnType)? _ ':' _ NEWLINE _ Body
+    Function        <- 'func' _ Identifier _ '(' _ Parameters? _ ')' _ (':' _ ReturnType)? _ ':' _ NEWLINE Body
     Parameters      <- Parameter (',' _ Parameter)*
     Parameter       <- Identifier (':' _ TypeHint)?
     ReturnType      <- TypeHint
-    Body            <- '{' _ Statement+ _ '}'
+    Body            <- '{' WS Statement+ WS '}'
     
     Statement       <- ReturnStmt / VarDeclStmt / AssignmentStmt / IfStmt / ForStmt / WhileStmt / MatchStmt / ExpressionStmt
     ReturnStmt      <- 'return' _ Expression? _ NEWLINE
     VarDeclStmt     <- 'var' _ Identifier _ (':' _ TypeHint)? _ ('=' _ Expression)? _ NEWLINE
     AssignmentStmt  <- IdentifierExpr _ '=' _ Expression _ NEWLINE
-    IfStmt          <- 'if' _ Expression _ ':' _ NEWLINE _ Body (ElifBranch)* (ElseBranch)?
-    ElifBranch      <- 'elif' _ Expression _ ':' _ NEWLINE _ Body
-    ElseBranch      <- 'else' _ ':' _ NEWLINE _ Body
-    ForStmt         <- 'for' _ Identifier _ 'in' _ Expression _ ':' _ NEWLINE _ Body
-    WhileStmt       <- 'while' _ Expression _ ':' _ NEWLINE _ Body
-    MatchStmt       <- 'match' _ Expression _ ':' _ NEWLINE _ MatchBranches
+    IfStmt          <- 'if' _ Expression _ ':' _ NEWLINE Body (ElifBranch)* (ElseBranch)?
+    ElifBranch      <- 'elif' _ Expression _ ':' _ NEWLINE Body
+    ElseBranch      <- 'else' _ ':' _ NEWLINE Body
+    ForStmt         <- 'for' _ Identifier _ 'in' _ Expression _ ':' _ NEWLINE Body
+    WhileStmt       <- 'while' _ Expression _ ':' _ NEWLINE Body
+    MatchStmt       <- 'match' _ Expression _ ':' _ NEWLINE MatchBranches
     MatchBranches   <- MatchBranch+
-    MatchBranch     <- Pattern _ ':' _ NEWLINE _ Body
+    MatchBranch     <- Pattern _ ':' _ NEWLINE Body
     Pattern         <- Literal / Identifier / '_'
     ExpressionStmt  <- Expression _ NEWLINE
     
@@ -181,12 +198,10 @@ static const char* gdscript_grammar = R"(
     UnaryOp         <- '-' / '+' / '!' / 'not'
     
     TypeHint        <- Identifier ('.' Identifier)*
-    # GDScript allows Unicode in identifiers (letters, digits, underscore)
-    # Using Unicode property classes: \p{L} for letters, \p{N} for numbers
-    # Fallback to ASCII if Unicode classes not supported: [a-zA-Z_\u0080-\uFFFF][a-zA-Z0-9_\u0080-\uFFFF]*
     Identifier      <- < [a-zA-Z_\u0080-\uFFFF] [a-zA-Z0-9_\u0080-\uFFFF]* >
     
     NEWLINE         <- '\n' / '\r\n' / '\r'
+    WS              <- [ \t\n\r]*
     _               <- [ \t]*
 )";
 
@@ -1224,10 +1239,11 @@ std::unique_ptr<ProgramNode> GDScriptParser::parse(const std::string& source) {
     last_error_message.clear();
     _errors.clear();
     
-    // Pre-process indentation to convert to braces
+    // Preprocess indentation to braces (standard approach for indentation-sensitive languages)
+    // This converts GDScript's indentation-based blocks to explicit { } markers
+    // The PEG parser then parses the preprocessed source normally
     std::string processed_source = preprocess_indentation(source);
     
-    // Parse with semantic actions
     std::any result;
     bool success = p->parse(processed_source, result);
     

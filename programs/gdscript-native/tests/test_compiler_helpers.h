@@ -38,6 +38,10 @@ static inline CompilationResult compileGDScript(const std::string& source) {
     result.ast = parser.parse(source);
     if (!result.ast) {
         result.errorMessage = parser.getErrorMessage();
+        // Add more context to error message
+        if (result.errorMessage.empty()) {
+            result.errorMessage = "Parse failed: AST is null";
+        }
         return result;
     }
     
