@@ -236,6 +236,11 @@ std::unique_ptr<StatementNode> GDScriptParser::parse_statement() {
         std::unique_ptr<IdentifierExpr> target = make_identifier(current);
         advance(); // Consume identifier
         
+        // Skip any NEWLINE tokens (assignment can be on next line in GDScript)
+        while (check(TokenType::NEWLINE)) {
+            advance();
+        }
+        
         // Check if next token is EQUAL (assignment operator)
         // After advance(), current should be the next token (EQUAL if assignment)
         if (check(TokenType::EQUAL)) {
