@@ -14,7 +14,7 @@ std::pair<const uint8_t*, size_t> ASTToRISCVEmitter::emit(const ProgramNode* pro
     _assembler = std::make_unique<biscuit::Assembler>(_code_buffer.data(), _code_buffer.size());
     
     // Emit all functions sequentially
-    for (const auto& func : program->functions) {
+    for (const std::unique_ptr<FunctionNode>& func : program->functions) {
         _emit_function(func.get());
         
         // Check buffer capacity (grow if >90% full)
@@ -73,7 +73,7 @@ void ASTToRISCVEmitter::_emit_function(const FunctionNode* func) {
     _stack_offset = static_cast<int>(func->parameters.size() * 8);
     
     // Emit function body
-    for (const auto& stmt : func->body) {
+    for (const std::unique_ptr<StatementNode>& stmt : func->body) {
         _emit_statement(stmt.get());
     }
     
@@ -353,8 +353,8 @@ void ASTToRISCVEmitter::_emit_if_statement(const IfStatement* if_stmt) {
         biscuit::GPR cond_reg = _get_or_allocate_register(if_stmt->condition.get());
         
         // Create labels
-        auto else_label = std::make_unique<biscuit::Label>();
-        auto end_label = std::make_unique<biscuit::Label>();
+        std::unique_ptr<biscuit::Label> else_label = std::make_unique<biscuit::Label>();
+        std::unique_ptr<biscuit::Label> end_label = std::make_unique<biscuit::Label>();
         biscuit::Label* else_ptr = else_label.get();
         biscuit::Label* end_ptr = end_label.get();
         _labels.push_back(std::move(else_label));
@@ -364,7 +364,7 @@ void ASTToRISCVEmitter::_emit_if_statement(const IfStatement* if_stmt) {
         _assembler->BEQZ(cond_reg, else_ptr);
         
         // Emit then body
-        for (const auto& stmt : if_stmt->then_body) {
+        for (const std::unique_ptr<StatementNode>& stmt : if_stmt->then_body) {
             _emit_statement(stmt.get());
         }
         
@@ -375,9 +375,9 @@ void ASTToRISCVEmitter::_emit_if_statement(const IfStatement* if_stmt) {
         _assembler->Bind(else_ptr);
         
         // Emit elif branches
-        for (const auto& branch : if_stmt->elif_branches) {
-            auto elif_else_label = std::make_unique<biscuit::Label>();
-            auto elif_end_label = std::make_unique<biscuit::Label>();
+        for (const std::pair<std::unique_ptr<ExpressionNode>, std::vector<std::unique_ptr<StatementNode>>>& branch : if_stmt->elif_branches) {
+            std::unique_ptr<biscuit::Label> elif_else_label = std::make_unique<biscuit::Label>();
+            std::unique_ptr<biscuit::Label> elif_end_label = std::make_unique<biscuit::Label>();
             biscuit::Label* elif_else_ptr = elif_else_label.get();
             biscuit::Label* elif_end_ptr = elif_end_label.get();
             _labels.push_back(std::move(elif_else_label));
@@ -391,7 +391,7 @@ void ASTToRISCVEmitter::_emit_if_statement(const IfStatement* if_stmt) {
             }
             
             // Emit elif body
-            for (const auto& stmt : branch.second) {
+            for (const std::unique_ptr<StatementNode>& stmt : branch.second) {
                 _emit_statement(stmt.get());
             }
             
@@ -406,7 +406,7 @@ void ASTToRISCVEmitter::_emit_if_statement(const IfStatement* if_stmt) {
         }
         
         // Emit else body
-        for (const auto& stmt : if_stmt->else_body) {
+        for (const std::unique_ptr<StatementNode>& stmt : if_stmt->else_body) {
             _emit_statement(stmt.get());
         }
         
@@ -474,7 +474,7 @@ int ASTToRISCVEmitter::_allocate_stack(const std::string& varName) {
 }
 
 biscuit::GPR ASTToRISCVEmitter::_get_or_allocate_register(const ExpressionNode* expr) {
-    auto it = _expr_to_reg.find(expr);
+    std::unordered_map<const ExpressionNode*, biscuit::GPR>::const_iterator it = _expr_to_reg.find(expr);
     if (it != _expr_to_reg.end()) {
         return it->second;
     }
@@ -484,7 +484,7 @@ biscuit::GPR ASTToRISCVEmitter::_get_or_allocate_register(const ExpressionNode* 
 }
 
 int ASTToRISCVEmitter::_get_var_stack_offset(const std::string& varName) {
-    auto it = _var_to_stack_offset.find(varName);
+    std::unordered_map<std::string, int>::const_iterator it = _var_to_stack_offset.find(varName);
     if (it != _var_to_stack_offset.end()) {
         return it->second;
     }

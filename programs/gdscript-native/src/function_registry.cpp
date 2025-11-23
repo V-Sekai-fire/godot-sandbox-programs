@@ -11,7 +11,7 @@ void FunctionRegistry::register_function(const std::string& name, void* address,
 }
 
 void* FunctionRegistry::get_function(const std::string& name) const {
-    auto it = _functions.find(name);
+    std::unordered_map<std::string, void*>::const_iterator it = _functions.find(name);
     if (it != _functions.end()) {
         return it->second;
     }
@@ -25,7 +25,7 @@ bool FunctionRegistry::has_function(const std::string& name) const {
 std::vector<std::string> FunctionRegistry::get_function_names() const {
     std::vector<std::string> names;
     names.reserve(_functions.size());
-    for (const auto& pair : _functions) {
+    for (const std::pair<const std::string, void*>& pair : _functions) {
         names.push_back(pair.first);
     }
     return names;
@@ -37,7 +37,7 @@ void FunctionRegistry::clear() {
 }
 
 size_t FunctionRegistry::get_function_size(const std::string& name) const {
-    auto it = _function_sizes.find(name);
+    std::unordered_map<std::string, size_t>::const_iterator it = _function_sizes.find(name);
     if (it != _function_sizes.end()) {
         return it->second;
     }

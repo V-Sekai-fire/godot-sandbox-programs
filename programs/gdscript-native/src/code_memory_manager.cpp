@@ -74,7 +74,7 @@ void* ExecutableMemory::release() {
 }
 
 ExecutableMemory* CodeMemoryManager::allocate(size_t size) {
-    auto mem = std::make_unique<ExecutableMemory>(size);
+    std::unique_ptr<ExecutableMemory> mem = std::make_unique<ExecutableMemory>(size);
     ExecutableMemory* ptr = mem.get();
     allocations.push_back(std::move(mem));
     return ptr;

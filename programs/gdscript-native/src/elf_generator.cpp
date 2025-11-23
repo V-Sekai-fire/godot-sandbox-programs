@@ -34,7 +34,7 @@ std::vector<uint8_t> ELFGenerator::generate() {
     
     // Calculate sizes
     size_t code_size = 0;
-    for (const auto& section : _code_sections) {
+    for (const CodeSection& section : _code_sections) {
         code_size += section.data.size();
     }
     
@@ -87,7 +87,7 @@ std::vector<uint8_t> ELFGenerator::generate() {
     
     // Write code sections at code_offset_in_file
     offset = code_offset_in_file;
-    for (const auto& section : _code_sections) {
+    for (const CodeSection& section : _code_sections) {
         std::memcpy(elf.data() + offset, section.data.data(), section.data.size());
         offset += section.data.size();
     }

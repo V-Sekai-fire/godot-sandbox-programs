@@ -11,6 +11,7 @@
 #include <sys/mman.h>
 #include <variant>
 #include <iostream>
+#include <sstream>
 
 using namespace gdscript;
 

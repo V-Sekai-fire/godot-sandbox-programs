@@ -30,7 +30,7 @@ static Variant compile_gdscript(String gdscript_code) {
 	}
 	
 	std::string source = gdscript_code.utf8().get_data();
-	auto ast = parser.parse(source);
+	std::unique_ptr<gdscript::ProgramNode> ast = parser.parse(source);
 	
 	if (!ast) {
 		print("Error: Failed to parse GDScript code\n");
@@ -40,7 +40,9 @@ static Variant compile_gdscript(String gdscript_code) {
 	
 	// Convert AST directly to RISC-V machine code using biscuit (like BEAM JIT with AsmJit)
 	gdscript::ASTToRISCVEmitter emitter;
-	auto [machineCode, codeSize] = emitter.emit(ast.get());
+	std::pair<const uint8_t*, size_t> emit_result = emitter.emit(ast.get());
+	const uint8_t* machineCode = emit_result.first;
+	size_t codeSize = emit_result.second;
 	
 	if (machineCode == nullptr || codeSize == 0) {
 		print("Error: Failed to emit RISC-V machine code\n");
@@ -61,7 +63,7 @@ static Variant compile_gdscript(String gdscript_code) {
 	// Functions are at entry point (0x10000) for now
 	// TODO: Calculate actual function addresses when we support multiple functions
 	uint64_t func_address = 0x10000;
-	for (const auto& func : ast->functions) {
+	for (const std::unique_ptr<gdscript::FunctionNode>& func : ast->functions) {
 		std::string funcName = func->name;
 		if (funcName.empty()) {
 			funcName = "main";

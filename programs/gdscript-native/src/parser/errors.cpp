@@ -23,7 +23,7 @@ std::string ErrorCollection::get_formatted_message() const {
     std::ostringstream oss;
     
     for (size_t i = 0; i < _errors.size(); ++i) {
-        const auto& error = _errors[i];
+        const CompilationError& error = _errors[i];
         
         // Error type prefix
         const char* typeStr = "";
@@ -74,7 +74,7 @@ std::string ErrorCollection::get_first_error_message() const {
 
 std::vector<CompilationError> ErrorCollection::get_errors_by_type(ErrorType type) const {
     std::vector<CompilationError> result;
-    for (const auto& error : _errors) {
+    for (const CompilationError& error : _errors) {
         if (error.type == type) {
             result.push_back(error);
         }
