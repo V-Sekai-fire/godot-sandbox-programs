@@ -37,36 +37,79 @@ std::vector<uint8_t> ELFGenerator::generate() {
         code_size += section.data.size();
     }
     
-    // Align code to page boundary (4KB)
-    size_t code_size_aligned = (code_size + 0xFFF) & ~0xFFF;
+    // Use actual code size (not aligned)
+    // Alignment is handled by p_align in program header for virtual addresses
+    // But file size should match actual code size
     
     // Calculate offsets
+    // Match C ELF layout: p_offset = 0x0 (segment starts at file offset 0)
+    // This means the segment includes the ELF header and program headers
+    // The actual code is placed after the headers within the segment
     size_t elf_header_size = 64; // ELF64 header
     size_t phdr_size = 56; // ELF64 program header
     size_t phdr_offset = elf_header_size;
-    size_t code_offset = phdr_offset + phdr_size;
-    size_t total_size = code_offset + code_size_aligned;
+    size_t code_offset_in_file = elf_header_size + phdr_size; // Code starts after headers (120 bytes)
+    
+    // p_offset must satisfy: p_offset % p_align == p_vaddr % p_align
+    // p_vaddr = 0x10000, p_align = 0x1000, so p_vaddr % p_align = 0
+    // Therefore p_offset must be a multiple of 0x1000
+    // Use p_offset = 0x0 like the C ELF does
+    size_t p_align = 0x1000;
+    size_t p_offset = 0x0; // Segment starts at file offset 0, like C ELF
+    
+    // Section headers: null (0) + .text (1) + .shstrtab (2) = 3 sections
+    size_t shdr_size = 64; // ELF64 section header size
+    size_t num_sections = 3; // null, .text, .shstrtab
+    size_t shstrtab_size = 16; // ".text\0.shstrtab\0" = 16 bytes
+    
+    // Calculate total segment size (p_filesz)
+    // Segment includes: ELF header + program headers + code + padding to align
+    size_t segment_size = code_offset_in_file + code_size;
+    // Align segment size to page boundary
+    segment_size = ((segment_size + p_align - 1) / p_align) * p_align;
+    
+    // Entry point should be at the virtual address where code starts
+    // The code is placed at virtual address p_vaddr (0x10000) in memory
+    // The file offset (code_offset_in_file) is only for reading from the ELF file
+    // In memory, code starts at p_vaddr, so entry point = p_vaddr
+    uint64_t entry_point = ELF_ENTRY_POINT;
+    
+    // Calculate layout: segment at p_offset=0, then shstrtab, then section headers
+    size_t shstrtab_offset = segment_size;
+    size_t shdr_offset = shstrtab_offset + shstrtab_size;
+    size_t total_size = shdr_offset + (num_sections * shdr_size);
     
     std::vector<uint8_t> elf(total_size, 0);
     size_t offset = 0;
     
-    // Write ELF header
-    _write_elf_header(elf, offset);
+    // Write ELF header (at file offset 0, within the segment)
+    _write_elf_header(elf, offset, shdr_offset, num_sections, entry_point);
     
-    // Write program header
-    _write_program_headers(elf, phdr_offset, code_size_aligned);
+    // Write program header (at file offset 64, within the segment)
+    // p_filesz = segment_size (includes headers + code)
+    _write_program_headers(elf, phdr_offset, segment_size, p_offset);
     
-    // Write code sections
-    offset = code_offset;
+    // Write code sections after headers (at code_offset_in_file = 120)
+    offset = code_offset_in_file;
     for (const auto& section : _code_sections) {
         std::memcpy(elf.data() + offset, section.data.data(), section.data.size());
         offset += section.data.size();
     }
     
+    // Write string table for section names
+    _write_string_table(elf, shstrtab_offset);
+    
+    // Write section headers
+    // Note: Use code_offset_in_file for .text section sh_offset (where code actually is in file)
+    // libriscv's serialize_execute_segment uses .text section sh_offset if it exists
+    // Set .text sh_addr to p_vaddr (ELF_ENTRY_POINT), not the entry point, so libriscv creates
+    // the execute segment starting at the correct base address
+    _write_section_headers(elf, shdr_offset, code_offset_in_file, code_size, shstrtab_offset, shstrtab_size, ELF_ENTRY_POINT);
+    
     return elf;
 }
 
-void ELFGenerator::_write_elf_header(std::vector<uint8_t>& elf, size_t& offset) {
+void ELFGenerator::_write_elf_header(std::vector<uint8_t>& elf, size_t& offset, size_t shdr_offset, size_t num_sections, uint64_t entry_point) {
     // ELF magic
     std::memcpy(elf.data() + offset, ELF_MAGIC, 4);
     offset += 4;
@@ -101,16 +144,16 @@ void ELFGenerator::_write_elf_header(std::vector<uint8_t>& elf, size_t& offset) 
     *reinterpret_cast<uint32_t*>(elf.data() + offset) = 1;
     offset += 4;
     
-    // e_entry = entry point address
-    *reinterpret_cast<uint64_t*>(elf.data() + offset) = ELF_ENTRY_POINT;
+    // e_entry = entry point address (code location within segment)
+    *reinterpret_cast<uint64_t*>(elf.data() + offset) = entry_point;
     offset += 8;
     
     // e_phoff = program header offset
     *reinterpret_cast<uint64_t*>(elf.data() + offset) = 64; // After ELF header
     offset += 8;
     
-    // e_shoff = section header offset (0 for executable)
-    *reinterpret_cast<uint64_t*>(elf.data() + offset) = 0;
+    // e_shoff = section header offset
+    *reinterpret_cast<uint64_t*>(elf.data() + offset) = shdr_offset;
     offset += 8;
     
     // e_flags = 0
@@ -129,20 +172,20 @@ void ELFGenerator::_write_elf_header(std::vector<uint8_t>& elf, size_t& offset) 
     *reinterpret_cast<uint16_t*>(elf.data() + offset) = 1;
     offset += 2;
     
-    // e_shentsize = section header size (0, no sections)
-    *reinterpret_cast<uint16_t*>(elf.data() + offset) = 0;
+    // e_shentsize = section header size (64)
+    *reinterpret_cast<uint16_t*>(elf.data() + offset) = 64;
     offset += 2;
     
-    // e_shnum = number of section headers (0)
-    *reinterpret_cast<uint16_t*>(elf.data() + offset) = 0;
+    // e_shnum = number of section headers
+    *reinterpret_cast<uint16_t*>(elf.data() + offset) = num_sections;
     offset += 2;
     
-    // e_shstrndx = section header string table index (0)
-    *reinterpret_cast<uint16_t*>(elf.data() + offset) = 0;
+    // e_shstrndx = section header string table index (2 = .shstrtab)
+    *reinterpret_cast<uint16_t*>(elf.data() + offset) = 2;
     offset += 2;
 }
 
-void ELFGenerator::_write_program_headers(std::vector<uint8_t>& elf, size_t& offset, size_t code_size) {
+void ELFGenerator::_write_program_headers(std::vector<uint8_t>& elf, size_t& offset, size_t p_filesz, size_t p_offset) {
     // PT_LOAD program header
     // p_type = PT_LOAD (1)
     *reinterpret_cast<uint32_t*>(elf.data() + offset) = 1;
@@ -152,8 +195,8 @@ void ELFGenerator::_write_program_headers(std::vector<uint8_t>& elf, size_t& off
     *reinterpret_cast<uint32_t*>(elf.data() + offset) = 0x5; // PF_R | PF_X
     offset += 4;
     
-    // p_offset = offset in file
-    *reinterpret_cast<uint64_t*>(elf.data() + offset) = 64 + 56; // After ELF header + program header
+    // p_offset = offset in file (must be aligned: p_offset % p_align == p_vaddr % p_align)
+    *reinterpret_cast<uint64_t*>(elf.data() + offset) = p_offset;
     offset += 8;
     
     // p_vaddr = virtual address
@@ -164,12 +207,12 @@ void ELFGenerator::_write_program_headers(std::vector<uint8_t>& elf, size_t& off
     *reinterpret_cast<uint64_t*>(elf.data() + offset) = ELF_ENTRY_POINT;
     offset += 8;
     
-    // p_filesz = size in file
-    *reinterpret_cast<uint64_t*>(elf.data() + offset) = code_size;
+    // p_filesz = size in file (segment size, includes headers + code)
+    *reinterpret_cast<uint64_t*>(elf.data() + offset) = p_filesz;
     offset += 8;
     
-    // p_memsz = size in memory
-    *reinterpret_cast<uint64_t*>(elf.data() + offset) = code_size;
+    // p_memsz = size in memory (same as file size for now)
+    *reinterpret_cast<uint64_t*>(elf.data() + offset) = p_filesz;
     offset += 8;
     
     // p_align = alignment (4KB)
@@ -177,8 +220,74 @@ void ELFGenerator::_write_program_headers(std::vector<uint8_t>& elf, size_t& off
     offset += 8;
 }
 
-void ELFGenerator::_write_section_headers(std::vector<uint8_t>& elf, size_t& offset) {
-    // Not implemented - minimal ELF doesn't need section headers
+void ELFGenerator::_write_section_headers(std::vector<uint8_t>& elf, size_t shdr_offset, size_t code_offset, size_t code_size, size_t shstrtab_offset, size_t shstrtab_size, uint64_t text_vaddr) {
+    size_t offset = shdr_offset;
+    
+    // Section 0: NULL section header
+    *reinterpret_cast<uint32_t*>(elf.data() + offset) = 0; // sh_name = 0
+    offset += 4;
+    *reinterpret_cast<uint32_t*>(elf.data() + offset) = 0; // sh_type = SHT_NULL
+    offset += 4;
+    *reinterpret_cast<uint64_t*>(elf.data() + offset) = 0; // sh_flags = 0
+    offset += 8;
+    *reinterpret_cast<uint64_t*>(elf.data() + offset) = 0; // sh_addr = 0
+    offset += 8;
+    *reinterpret_cast<uint64_t*>(elf.data() + offset) = 0; // sh_offset = 0
+    offset += 8;
+    *reinterpret_cast<uint64_t*>(elf.data() + offset) = 0; // sh_size = 0
+    offset += 8;
+    *reinterpret_cast<uint32_t*>(elf.data() + offset) = 0; // sh_link = 0
+    offset += 4;
+    *reinterpret_cast<uint32_t*>(elf.data() + offset) = 0; // sh_info = 0
+    offset += 4;
+    *reinterpret_cast<uint64_t*>(elf.data() + offset) = 0; // sh_addralign = 0
+    offset += 8;
+    *reinterpret_cast<uint64_t*>(elf.data() + offset) = 0; // sh_entsize = 0
+    offset += 8;
+    
+    // Section 1: .text section header
+    *reinterpret_cast<uint32_t*>(elf.data() + offset) = 1; // sh_name = offset 1 in .shstrtab (".text")
+    offset += 4;
+    *reinterpret_cast<uint32_t*>(elf.data() + offset) = 1; // sh_type = SHT_PROGBITS
+    offset += 4;
+    *reinterpret_cast<uint64_t*>(elf.data() + offset) = 0x6; // sh_flags = SHF_ALLOC | SHF_EXECINSTR
+    offset += 8;
+    *reinterpret_cast<uint64_t*>(elf.data() + offset) = text_vaddr; // sh_addr = p_vaddr (segment base, not entry point)
+    offset += 8;
+    *reinterpret_cast<uint64_t*>(elf.data() + offset) = code_offset; // sh_offset = code offset
+    offset += 8;
+    *reinterpret_cast<uint64_t*>(elf.data() + offset) = code_size; // sh_size = code size
+    offset += 8;
+    *reinterpret_cast<uint32_t*>(elf.data() + offset) = 0; // sh_link = 0
+    offset += 4;
+    *reinterpret_cast<uint32_t*>(elf.data() + offset) = 0; // sh_info = 0
+    offset += 4;
+    *reinterpret_cast<uint64_t*>(elf.data() + offset) = 4; // sh_addralign = 4
+    offset += 8;
+    *reinterpret_cast<uint64_t*>(elf.data() + offset) = 0; // sh_entsize = 0
+    offset += 8;
+    
+    // Section 2: .shstrtab section header
+    *reinterpret_cast<uint32_t*>(elf.data() + offset) = 7; // sh_name = offset 7 in .shstrtab (".shstrtab")
+    offset += 4;
+    *reinterpret_cast<uint32_t*>(elf.data() + offset) = 3; // sh_type = SHT_STRTAB
+    offset += 4;
+    *reinterpret_cast<uint64_t*>(elf.data() + offset) = 0; // sh_flags = 0
+    offset += 8;
+    *reinterpret_cast<uint64_t*>(elf.data() + offset) = 0; // sh_addr = 0
+    offset += 8;
+    *reinterpret_cast<uint64_t*>(elf.data() + offset) = shstrtab_offset; // sh_offset = string table offset
+    offset += 8;
+    *reinterpret_cast<uint64_t*>(elf.data() + offset) = shstrtab_size; // sh_size = string table size
+    offset += 8;
+    *reinterpret_cast<uint32_t*>(elf.data() + offset) = 0; // sh_link = 0
+    offset += 4;
+    *reinterpret_cast<uint32_t*>(elf.data() + offset) = 0; // sh_info = 0
+    offset += 4;
+    *reinterpret_cast<uint64_t*>(elf.data() + offset) = 1; // sh_addralign = 1
+    offset += 8;
+    *reinterpret_cast<uint64_t*>(elf.data() + offset) = 0; // sh_entsize = 0
+    offset += 8;
 }
 
 void ELFGenerator::_write_symbol_table(std::vector<uint8_t>& elf, size_t& offset) {
@@ -186,8 +295,10 @@ void ELFGenerator::_write_symbol_table(std::vector<uint8_t>& elf, size_t& offset
     // Symbols would be added via section headers
 }
 
-void ELFGenerator::_write_string_table(std::vector<uint8_t>& elf, size_t& offset) {
-    // Not implemented - minimal ELF doesn't need string table
+void ELFGenerator::_write_string_table(std::vector<uint8_t>& elf, size_t offset) {
+    // Write .shstrtab: "\0.text\0.shstrtab\0"
+    const char* strtab = "\0.text\0.shstrtab\0";
+    std::memcpy(elf.data() + offset, strtab, 16);
 }
 
 } // namespace gdscript

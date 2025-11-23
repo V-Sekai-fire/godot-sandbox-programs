@@ -49,19 +49,19 @@ private:
     static constexpr uint64_t ELF_ENTRY_POINT = 0x10000; // Default entry point
     
     // Write ELF header
-    void _write_elf_header(std::vector<uint8_t>& elf, size_t& offset);
+    void _write_elf_header(std::vector<uint8_t>& elf, size_t& offset, size_t shdr_offset, size_t num_sections, uint64_t entry_point);
     
     // Write program headers
-    void _write_program_headers(std::vector<uint8_t>& elf, size_t& offset, size_t code_size);
+    void _write_program_headers(std::vector<uint8_t>& elf, size_t& offset, size_t p_filesz, size_t p_offset);
     
     // Write section headers
-    void _write_section_headers(std::vector<uint8_t>& elf, size_t& offset);
+    void _write_section_headers(std::vector<uint8_t>& elf, size_t shdr_offset, size_t code_offset, size_t code_size, size_t shstrtab_offset, size_t shstrtab_size, uint64_t text_vaddr);
     
     // Write symbol table
     void _write_symbol_table(std::vector<uint8_t>& elf, size_t& offset);
     
     // Write string table
-    void _write_string_table(std::vector<uint8_t>& elf, size_t& offset);
+    void _write_string_table(std::vector<uint8_t>& elf, size_t offset);
 };
 
 } // namespace gdscript
