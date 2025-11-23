@@ -10,6 +10,9 @@ add_ci_program(gdscript_native
 	ast_to_riscv_biscuit.cpp
 	test_data_loader.cpp
 	parser/gdscript_parser.cpp
+	parser/errors.cpp
+	function_registry.cpp
+	code_memory_manager.cpp
 )
 
 # Add biscuit library (RISC-V assembler, similar to AsmJit)

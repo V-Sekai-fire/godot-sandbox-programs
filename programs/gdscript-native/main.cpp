@@ -8,8 +8,16 @@
 #include "ast_to_riscv_biscuit.h"
 #include "test_data_loader.h"
 #include "parser/gdscript_parser.h"
+#include "function_registry.h"
+#include "code_memory_manager.h"
 
 using AsmCallback = Variant(*)();
+
+// Global function registry to track compiled functions
+static gdscript::FunctionRegistry g_functionRegistry;
+
+// Global memory manager to track executable memory allocations
+static gdscript::CodeMemoryManager g_memoryManager;
 
 // Compile a simple GDScript-like function to RISC-V and return a callable
 static Variant compile_gdscript(String gdscript_code) {
@@ -44,18 +52,51 @@ static Variant compile_gdscript(String gdscript_code) {
 	}
 	print("Generated ", codeSize, " bytes of RISC-V machine code\n");
 	
-	// Allocate executable memory and copy machine code (like BEAM JIT)
-	void *executable = mmap(nullptr, codeSize, PROT_READ | PROT_WRITE | PROT_EXEC, 
-	                       MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	// Allocate executable memory using memory manager (RAII, auto cleanup)
+	gdscript::ExecutableMemory* execMem = g_memoryManager.allocate(codeSize);
 	
-	if (executable == MAP_FAILED) {
+	if (!execMem || !execMem->isValid()) {
 		print("Error: Failed to allocate executable memory\n");
 		return Nil;
 	}
 	
-	std::memcpy(executable, machineCode, codeSize);
-	AsmCallback callback = (AsmCallback)executable;
-	return Callable::Create<Variant()>(callback);
+	// Copy machine code into executable memory
+	execMem->copy(machineCode, codeSize);
+	void* executable = execMem->get();
+	
+	// Register the function(s) in the registry
+	// For now, if there's a single function, register it by name
+	// Otherwise, register as "main" or the first function
+	if (!ast->functions.empty()) {
+		std::string funcName = ast->functions[0]->name;
+		if (funcName.empty()) {
+			funcName = "main";
+		}
+		g_functionRegistry.registerFunction(funcName, executable, codeSize);
+		print("Registered function: ", funcName.c_str(), "\n");
+		
+		// Create C++ wrapper that calls assembly and converts int64 to Variant
+		auto wrapper = [funcName]() -> Variant {
+			void* funcAddr = g_functionRegistry.getFunction(funcName);
+			if (!funcAddr) {
+				print("Error: Function not found in registry: ", funcName.c_str(), "\n");
+				return Nil;
+			}
+			
+			// Call assembly function and get int64 result
+			int64_t result = gdscript::callAssemblyFunction(funcAddr);
+			
+			// Convert int64 to Variant
+			return Variant(result);
+		};
+		
+		// Create callable from wrapper
+		return Callable::Create<Variant()>(wrapper);
+	} else {
+		// No functions, just return a callable that returns 0
+		AsmCallback callback = (AsmCallback)executable;
+		return Callable::Create<Variant()>(callback);
+	}
 }
 
 // Test function: compile and call a simple function

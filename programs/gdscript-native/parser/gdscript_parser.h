@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ast.h"
+#include "errors.h"
 #include <string>
 #include <memory>
 #include <any>
@@ -22,7 +23,10 @@ private:
     };
     ProgramData last_program_data;
     
-    // Store last error message for retrieval
+    // Error collection
+    ErrorCollection errors;
+    
+    // Store last error message for retrieval (for backward compatibility)
     mutable std::string last_error_message;
     
     // Build AST from parse result
@@ -43,8 +47,12 @@ public:
     // Parse GDScript source code and return AST
     std::unique_ptr<ProgramNode> parse(const std::string& source);
     
-    // Get error message if parsing failed
+    // Get error message if parsing failed (backward compatibility)
     std::string getErrorMessage() const;
+    
+    // Get error collection
+    const ErrorCollection& getErrors() const { return errors; }
+    ErrorCollection& getErrors() { return errors; }
     
     // Check if parser is valid
     bool isValid() const;

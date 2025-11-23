@@ -415,6 +415,11 @@ bool GDScriptParser::isValid() const {
 }
 
 std::string GDScriptParser::getErrorMessage() const {
+    // Return formatted error message from error collection if available
+    if (errors.hasErrors()) {
+        return errors.getFormattedMessage();
+    }
+    // Fallback to last_error_message for backward compatibility
     return last_error_message;
 }
 
@@ -532,6 +537,7 @@ std::unique_ptr<VariableDeclaration> convertVarDecl(const std::any& varDecl_any)
 std::unique_ptr<ProgramNode> GDScriptParser::parse(const std::string& source) {
     if (!isValid()) {
         last_error_message = "Parser initialization failed";
+        errors.addError(ErrorType::Parse, "Parser initialization failed");
         return nullptr;
     }
     
@@ -539,6 +545,7 @@ std::unique_ptr<ProgramNode> GDScriptParser::parse(const std::string& source) {
     
     // Clear previous error
     last_error_message.clear();
+    errors.clear();
     
     // Parse with semantic actions
     std::any result;
@@ -548,6 +555,7 @@ std::unique_ptr<ProgramNode> GDScriptParser::parse(const std::string& source) {
         // Store a generic error message (cpp-peglib doesn't expose detailed error info easily)
         // We could enhance this by using a custom log callback, but for now use a simple message
         last_error_message = "Parse error: Failed to parse GDScript source code";
+        errors.addError(ErrorType::Parse, "Failed to parse GDScript source code");
         return nullptr;
     }
     
