@@ -553,8 +553,13 @@ namespace riscv
 		const size_t plen = (midlen + PMASK) & ~PMASK;
 		// Because postlen uses midlen, we end up zeroing the extra 4 bytes in the end
 		const size_t postlen = plen - midlen;
-		//printf("Addr 0x%X Len %zx becomes 0x%X->0x%X PRE %zx MIDDLE %zu POST %zu TOTAL %zu\n",
-		//	vaddr, exlen, pbase, pbase + plen, prelen, exlen, postlen, plen);
+		if (options.verbose_loader) {
+			printf("* create_execute_segment: vaddr=0x%llX exlen=%zu\n", (unsigned long long)vaddr, exlen);
+			printf("  -> pbase=0x%llX prelen=%zu midlen=%zu plen=%zu postlen=%zu\n",
+				(unsigned long long)pbase, prelen, midlen, plen, postlen);
+			printf("  -> Code placed at: pbase+prelen=0x%llX (entry should be here)\n",
+				(unsigned long long)(pbase + prelen));
+		}
 		if (UNLIKELY(prelen > plen || prelen + exlen > plen)) {
 			throw MachineException(INVALID_PROGRAM, "Segment virtual base was bogus");
 		}

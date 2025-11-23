@@ -1,6 +1,8 @@
 // Test program to load and execute ELF file using libriscv
 // Following the same pattern as Godot sandbox
 #include <libriscv/machine.hpp>
+#include <libriscv/rsp_server.hpp>
+#include <libriscv/debug.hpp>
 #include <fstream>
 #include <vector>
 #include <iostream>
@@ -41,6 +43,7 @@ int main(int argc, char* argv[]) {
         options.memory_max = 64 << 20; // 64 MiB
         options.allow_write_exec_segment = true; // Allow executable segments
         options.protect_segments = false; // Don't enforce strict segment protection
+        options.verbose_loader = true; // Enable verbose logging for debugging
         
         // Create RISC-V machine with binary (using string_view, like Godot sandbox)
         std::string_view binary_view{reinterpret_cast<const char*>(binary.data()), binary.size()};
@@ -48,6 +51,7 @@ int main(int argc, char* argv[]) {
         
         std::cout << "Machine created successfully\n";
         std::cout << "Entry point: 0x" << std::hex << machine.cpu.pc() << std::dec << "\n";
+        std::cout << "Start address: 0x" << std::hex << machine.memory.start_address() << std::dec << "\n";
         
         // Setup Linux environment (like Godot sandbox does)
         machine.setup_linux({"test_program"});
@@ -58,9 +62,24 @@ int main(int argc, char* argv[]) {
         // Set instruction limit
         machine.set_max_instructions(1'000'000);
         
-        // Run the program through initialization (like Godot sandbox)
-        std::cout << "Starting execution...\n";
-        machine.simulate();
+        // Use built-in debug facilities (works without GDB)
+        std::cout << "\n=== Using Built-in Debugger ===\n";
+        riscv::DebugMachine debug { machine };
+        debug.verbose_instructions = true; // Print all instructions
+        debug.print_and_pause(); // Break immediately
+        
+        // Run the program with debugging
+        std::cout << "Starting execution with debug output...\n";
+        try {
+            debug.simulate();
+        } catch (riscv::MachineException& me) {
+            std::cerr << ">>> Machine exception " << me.type() << ": " << me.what() 
+                      << " (data: 0x" << std::hex << me.data() << std::dec << ")\n";
+            debug.print_and_pause();
+        } catch (std::exception& e) {
+            std::cerr << ">>> General exception: " << e.what() << "\n";
+            debug.print_and_pause();
+        }
         
         // Get exit code (from a0 register, which is register 10)
         // In RISC-V Linux ABI, exit code is returned in a0

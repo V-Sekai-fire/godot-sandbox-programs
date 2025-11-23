@@ -59,8 +59,16 @@ namespace riscv
 			// the execute segment is marked as execute-only.
 			if (!current_execute_segment().is_execute_only())
 			{
+				const address_t pageno = initial_pc / riscv::Page::size();
 				const auto& page =
-					machine().memory.get_exec_pageno(initial_pc / riscv::Page::size());
+					machine().memory.get_exec_pageno(pageno);
+				printf("* CPU::reset(): Checking entry point 0x%llX (page %llu)\n",
+					(unsigned long long)initial_pc, (unsigned long long)pageno);
+				printf("  -> Page exec attribute: %d\n", page.attr.exec);
+				printf("  -> Page read attribute: %d\n", page.attr.read);
+				printf("  -> Page write attribute: %d\n", page.attr.write);
+				printf("  -> Execute segment empty: %d\n", current_execute_segment().empty());
+				printf("  -> Execute segment is_execute_only: %d\n", current_execute_segment().is_execute_only());
 				if (UNLIKELY(!page.attr.exec))
 					trigger_exception(EXECUTION_SPACE_PROTECTION_FAULT, initial_pc);
 			}
@@ -110,6 +118,11 @@ restart_next_execute_segment:
 		const auto& current_page =
 			machine().memory.get_pageno(base_pageno);
 		if (UNLIKELY(!current_page.attr.exec)) {
+			printf("* EXECUTION_SPACE_PROTECTION_FAULT at PC=0x%llX (page %llu)\n",
+				(unsigned long long)pc, (unsigned long long)base_pageno);
+			printf("  -> Page exec: %d, read: %d, write: %d\n",
+				current_page.attr.exec, current_page.attr.read, current_page.attr.write);
+			printf("  -> Execute segment empty: %d\n", this->m_exec->empty());
 			this->m_fault(*this, current_page);
 			pc = this->pc();
 

@@ -1,0 +1,13 @@
+# GDB commands for debugging simple.elf
+# Run: gdb-multiarch test_output/simple.elf -x gdb_commands.txt
+# Or: riscv64-unknown-elf-gdb test_output/simple.elf -x gdb_commands.txt
+
+target remote :2159
+break *0x10078
+info registers
+x/10i $pc
+continue
+info registers
+x/10i $pc
+backtrace
+quit

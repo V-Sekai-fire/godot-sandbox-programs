@@ -307,11 +307,19 @@ namespace riscv
 					}
 				}
 			}
-			//printf("* Found .text section inside segment: %p -> %p\n",
-			//	(void*)uintptr_t(vaddr), (void*)uintptr_t(vaddr + exlen));
+			if (options.verbose_loader) {
+				printf("* Found .text section inside segment: %p -> %p (size %zu)\n",
+					(void*)uintptr_t(vaddr), (void*)uintptr_t(vaddr + exlen), exlen);
+				printf("* .text section: data from file offset %zu, placing at vaddr %p\n",
+					texthdr->sh_offset, (void*)uintptr_t(vaddr));
+			}
 		}
 
 		// Create an *initial* execute segment
+		if (options.verbose_loader) {
+			printf("* Creating execute segment: vaddr=%p, exlen=%zu, data=%p\n",
+				(void*)uintptr_t(vaddr), exlen, (void*)data);
+		}
 		auto& exec_segment =
 			this->create_execute_segment(options, data, vaddr, exlen, true);
 		// Set the segment as execute-only when R|W are not set
