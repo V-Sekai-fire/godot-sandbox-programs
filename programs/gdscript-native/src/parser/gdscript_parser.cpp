@@ -293,17 +293,20 @@ std::unique_ptr<VariableDeclaration> GDScriptParser::parse_variable_declaration(
 }
 
 std::unique_ptr<AssignmentStatement> GDScriptParser::parse_assignment_statement() {
-    // Target (must be identifier)
+    // Target (must be identifier) - we already checked this before calling
     if (!check(TokenType::IDENTIFIER)) {
         return nullptr; // Not an assignment, fail silently
     }
     
     std::unique_ptr<IdentifierExpr> target = make_identifier(current);
-    advance();
+    advance(); // Consume identifier, should get EQUAL from lookahead if peek() was called
     
-    // Assignment operator - if not present, this isn't an assignment
+    // Assignment operator - should be in current if peek() was called
+    // If not, try to consume it (might not be in lookahead if called directly)
     if (!check(TokenType::EQUAL)) {
-        return nullptr; // Not an assignment, fail silently
+        // EQUAL should be in lookahead from peek() call
+        // If not, this isn't an assignment
+        return nullptr;
     }
     advance(); // consume '='
     std::string op = "="; // For now, only support simple assignment
