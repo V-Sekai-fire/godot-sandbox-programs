@@ -1,0 +1,3 @@
+/Users/ernest.lee/Downloads/godot-sandbox-programs/build/_deps/libmir-subbuild/CMakeFiles/libmir-populate.dir
+/Users/ernest.lee/Downloads/godot-sandbox-programs/build/_deps/libmir-subbuild/CMakeFiles/edit_cache.dir
+/Users/ernest.lee/Downloads/godot-sandbox-programs/build/_deps/libmir-subbuild/CMakeFiles/rebuild_cache.dir

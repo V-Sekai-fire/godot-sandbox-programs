@@ -9,7 +9,7 @@ set(CMAKE_MAKEFILE_DEPENDS
   "CMakeCache.txt"
   "CMakeFiles/4.1.2/CMakeSystem.cmake"
   "CMakeLists.txt"
-  "godot-sandbox-populate-prefix/tmp/godot-sandbox-populate-mkdirs.cmake"
+  "tinycc-populate-prefix/tmp/tinycc-populate-mkdirs.cmake"
   "/opt/homebrew/share/cmake/Modules/CMakeGenericSystem.cmake"
   "/opt/homebrew/share/cmake/Modules/CMakeInitializeConfigs.cmake"
   "/opt/homebrew/share/cmake/Modules/CMakeSystemSpecificInformation.cmake"
@@ -36,17 +36,17 @@ set(CMAKE_MAKEFILE_OUTPUTS
 
 # Byproducts of CMake generate step:
 set(CMAKE_MAKEFILE_PRODUCTS
-  "godot-sandbox-populate-prefix/tmp/godot-sandbox-populate-mkdirs.cmake"
-  "godot-sandbox-populate-prefix/tmp/godot-sandbox-populate-gitclone.cmake"
-  "godot-sandbox-populate-prefix/src/godot-sandbox-populate-stamp/godot-sandbox-populate-gitinfo.txt"
-  "godot-sandbox-populate-prefix/tmp/godot-sandbox-populate-gitupdate.cmake"
-  "godot-sandbox-populate-prefix/src/godot-sandbox-populate-stamp/godot-sandbox-populate-update-info.txt"
-  "godot-sandbox-populate-prefix/src/godot-sandbox-populate-stamp/godot-sandbox-populate-patch-info.txt"
-  "godot-sandbox-populate-prefix/tmp/godot-sandbox-populate-cfgcmd.txt"
+  "tinycc-populate-prefix/tmp/tinycc-populate-mkdirs.cmake"
+  "tinycc-populate-prefix/tmp/tinycc-populate-gitclone.cmake"
+  "tinycc-populate-prefix/src/tinycc-populate-stamp/tinycc-populate-gitinfo.txt"
+  "tinycc-populate-prefix/tmp/tinycc-populate-gitupdate.cmake"
+  "tinycc-populate-prefix/src/tinycc-populate-stamp/tinycc-populate-update-info.txt"
+  "tinycc-populate-prefix/src/tinycc-populate-stamp/tinycc-populate-patch-info.txt"
+  "tinycc-populate-prefix/tmp/tinycc-populate-cfgcmd.txt"
   "CMakeFiles/CMakeDirectoryInformation.cmake"
   )
 
 # Dependency information for all targets:
 set(CMAKE_DEPEND_INFO_FILES
-  "CMakeFiles/godot-sandbox-populate.dir/DependInfo.cmake"
+  "CMakeFiles/tinycc-populate.dir/DependInfo.cmake"
   )

@@ -1,0 +1,14 @@
+# Target labels
+ tinycc-populate
+# Source files and their labels
+/Users/ernest.lee/Downloads/godot-sandbox-programs/build/_deps/tinycc-subbuild/CMakeFiles/tinycc-populate
+/Users/ernest.lee/Downloads/godot-sandbox-programs/build/_deps/tinycc-subbuild/CMakeFiles/tinycc-populate.rule
+/Users/ernest.lee/Downloads/godot-sandbox-programs/build/_deps/tinycc-subbuild/CMakeFiles/tinycc-populate-complete.rule
+/Users/ernest.lee/Downloads/godot-sandbox-programs/build/_deps/tinycc-subbuild/tinycc-populate-prefix/src/tinycc-populate-stamp/tinycc-populate-build.rule
+/Users/ernest.lee/Downloads/godot-sandbox-programs/build/_deps/tinycc-subbuild/tinycc-populate-prefix/src/tinycc-populate-stamp/tinycc-populate-configure.rule
+/Users/ernest.lee/Downloads/godot-sandbox-programs/build/_deps/tinycc-subbuild/tinycc-populate-prefix/src/tinycc-populate-stamp/tinycc-populate-download.rule
+/Users/ernest.lee/Downloads/godot-sandbox-programs/build/_deps/tinycc-subbuild/tinycc-populate-prefix/src/tinycc-populate-stamp/tinycc-populate-install.rule
+/Users/ernest.lee/Downloads/godot-sandbox-programs/build/_deps/tinycc-subbuild/tinycc-populate-prefix/src/tinycc-populate-stamp/tinycc-populate-mkdir.rule
+/Users/ernest.lee/Downloads/godot-sandbox-programs/build/_deps/tinycc-subbuild/tinycc-populate-prefix/src/tinycc-populate-stamp/tinycc-populate-patch.rule
+/Users/ernest.lee/Downloads/godot-sandbox-programs/build/_deps/tinycc-subbuild/tinycc-populate-prefix/src/tinycc-populate-stamp/tinycc-populate-test.rule
+/Users/ernest.lee/Downloads/godot-sandbox-programs/build/_deps/tinycc-subbuild/tinycc-populate-prefix/src/tinycc-populate-stamp/tinycc-populate-update.rule
