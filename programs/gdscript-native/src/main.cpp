@@ -24,7 +24,8 @@ static gdscript::FunctionRegistry g_functionRegistry;
 static gdscript::CodeMemoryManager g_memoryManager;
 
 // Global mode setting (can be changed via API)
-// Start with INTERPRET mode for development, migrate to NATIVE_CODE gradually
+// NATIVE_CODE mode is disabled for now - using INTERPRET mode only
+// TODO: Re-enable NATIVE_CODE templates once RISC-V execution issues are resolved
 static gdscript::CompilerMode g_compiler_mode = gdscript::CompilerMode::INTERPRET;
 
 // Compile GDScript to RISC-V ELF file (following Godot sandbox calling convention)
@@ -76,6 +77,12 @@ static Variant compile_gdscript(String gdscript_code) {
 		return Variant(0);
 	} else {
 		// Native code template mode (like BeamAsm)
+		// DISABLED: Native code templates are disabled for now
+		// TODO: Re-enable once RISC-V execution issues (PC=0x0) are resolved
+		print("Error: NATIVE_CODE mode is disabled. Use INTERPRET mode instead.\n");
+		return Nil;
+		
+		/* DISABLED CODE:
 		gdscript::ASTToRISCVEmitter emitter;
 		std::pair<const uint8_t*, size_t> emit_result = emitter.emit(ast.get());
 		const uint8_t* machineCode = emit_result.first;
@@ -125,19 +132,22 @@ static Variant compile_gdscript(String gdscript_code) {
 		std::memcpy(result.ptrw(), elf_data.data(), elf_data.size());
 		
 		return result;
+		*/
 	}
 }
 
 // Set compiler mode (0=INTERPRET, 1=NATIVE_CODE)
+// NOTE: NATIVE_CODE mode is disabled - only INTERPRET mode is available
 static Variant set_compiler_mode(int mode) {
 	if (mode == 0) {
 		g_compiler_mode = gdscript::CompilerMode::INTERPRET;
 		print("Compiler mode set to: INTERPRET\n");
 	} else if (mode == 1) {
-		g_compiler_mode = gdscript::CompilerMode::NATIVE_CODE;
-		print("Compiler mode set to: NATIVE_CODE\n");
+		// NATIVE_CODE mode is disabled
+		print("Error: NATIVE_CODE mode is disabled. Use INTERPRET mode (0) instead.\n");
+		return Variant(false);
 	} else {
-		print("Error: Invalid mode (0=INTERPRET, 1=NATIVE_CODE)\n");
+		print("Error: Invalid mode (0=INTERPRET, 1=NATIVE_CODE is disabled)\n");
 		return Variant(false);
 	}
 	return Variant(true);
