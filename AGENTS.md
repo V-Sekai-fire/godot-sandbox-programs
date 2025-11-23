@@ -43,23 +43,38 @@ GDScript Source Code
 
 **Conclusion**: Direct AST → RISC-V compilation aligns with BEAM JIT philosophy of simplicity and direct code generation.
 
-#### Parser Choice (cpp-peglib)
+#### Parser Choice (Hand-Written Recursive Descent)
 
-**Current**: Using cpp-peglib (PEG parser generator)
+**Current**: Using cpp-peglib (PEG parser generator) - **TO BE REPLACED**
 
 **Status**: Working but has limitations:
 - Requires workarounds for Program rule semantic value storage
 - Fragile semantic value extraction (string-based type checking)
 - Limited error reporting capabilities
+- Complex std::any conversions (shared_ptr → unique_ptr)
 
-**Future Consideration**: May switch to hand-written recursive descent parser for:
-- Better error messages
-- Direct AST construction (no std::any conversions)
-- Easier debugging
-- Full control over parsing logic
-- Better alignment with BEAM JIT simplicity philosophy
+**Decision**: **Switch to hand-written recursive descent parser**
 
-**Decision**: Continue with cpp-peglib for now, but improve error handling and reduce workarounds. Re-evaluate if parser complexity grows significantly.
+**Rationale**:
+- **Better Error Messages**: Direct control over error reporting with source locations
+- **Direct AST Construction**: No std::any conversions needed, build AST nodes directly
+- **Easier Debugging**: Clear parsing logic, easy to step through in debugger
+- **Full Control**: Complete control over parsing behavior and error recovery
+- **Simpler**: No external parser generator, just C++ code
+- **Alignment**: Matches BEAM JIT philosophy of simplicity and direct code generation
+
+**Implementation Plan**:
+1. **Lexer**: Tokenize source code with source location tracking
+2. **Parser**: Recursive descent parser with direct AST construction
+3. **Error Handling**: Structured error system with multiple error collection
+4. **Migration**: Implement alongside existing parser, test thoroughly, then replace
+
+**Benefits Over cpp-peglib**:
+- Eliminates all workarounds (no Program rule issue, no std::any conversions)
+- Better error messages with source context
+- Type-safe AST construction
+- Easier to extend with new language features
+- Better performance (no parser generator overhead)
 
 #### Godot Sandbox Calling Convention
 
