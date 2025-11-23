@@ -16,4 +16,5 @@
 #include "test_ast_interpreter.cpp"
 #include "test_adhoc.cpp"
 #include "test_assignment_parse.cpp"
+#include "test_token_debug.cpp"
 
