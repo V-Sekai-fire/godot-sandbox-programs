@@ -200,8 +200,45 @@ std::unique_ptr<StatementNode> GDScriptParser::parse_statement() {
     if (check(TokenType::VAR)) {
         return parse_variable_declaration();
     }
+    if (check(TokenType::IF)) {
+        return parse_if_statement();
+    }
+    if (check(TokenType::WHILE)) {
+        return parse_while_statement();
+    }
+    if (check(TokenType::FOR)) {
+        return parse_for_statement();
+    }
     
-    // Expression statement (not implemented yet)
+    // Try assignment statement: identifier = expression
+    // Simple approach: if we see identifier followed by =, it's an assignment
+    // We'll check by looking ahead one token
+    if (check(TokenType::IDENTIFIER)) {
+        // Temporarily advance to peek at next token
+        Token saved_prev = previous;
+        Token saved_curr = current;
+        advance(); // Move to next token
+        bool is_assignment = check(TokenType::EQUAL);
+        // Restore (we can't rewind tokenizer, but we can restore our tokens)
+        // Actually, we need a different approach - just try parsing assignment first
+        // and if it fails, fall back to expression
+        previous = saved_prev;
+        current = saved_curr;
+        
+        if (is_assignment) {
+            return parse_assignment_statement();
+        }
+    }
+    
+    // Expression statement (fallback for function calls, etc.)
+    std::unique_ptr<ExpressionNode> expr = parse_expression();
+    if (expr) {
+        std::unique_ptr<ExpressionStatement> stmt = std::make_unique<ExpressionStatement>();
+        stmt->expression = std::move(expr);
+        match(TokenType::NEWLINE); // Consume newline
+        return stmt;
+    }
+    
     return nullptr;
 }
 
@@ -250,6 +287,133 @@ std::unique_ptr<VariableDeclaration> GDScriptParser::parse_variable_declaration(
     match(TokenType::NEWLINE);
     
     return decl;
+}
+
+std::unique_ptr<AssignmentStatement> GDScriptParser::parse_assignment_statement() {
+    // Target (must be identifier)
+    if (!check(TokenType::IDENTIFIER)) {
+        return nullptr; // Not an assignment, fail silently
+    }
+    
+    std::unique_ptr<IdentifierExpr> target = make_identifier(current);
+    advance();
+    
+    // Assignment operator - if not present, this isn't an assignment
+    if (!check(TokenType::EQUAL)) {
+        return nullptr; // Not an assignment, fail silently
+    }
+    advance(); // consume '='
+    std::string op = "="; // For now, only support simple assignment
+    
+    // Value expression
+    std::unique_ptr<ExpressionNode> value = parse_expression();
+    if (!value) {
+        error_at_current("Expected expression for assignment value");
+        return nullptr;
+    }
+    
+    std::unique_ptr<AssignmentStatement> stmt = std::make_unique<AssignmentStatement>();
+    stmt->target = std::move(target);
+    stmt->op = op;
+    stmt->value = std::move(value);
+    
+    // Consume newline
+    match(TokenType::NEWLINE);
+    
+    return stmt;
+}
+
+std::unique_ptr<IfStatement> GDScriptParser::parse_if_statement() {
+    consume(TokenType::IF, "Expected 'if'");
+    
+    std::unique_ptr<IfStatement> stmt = std::make_unique<IfStatement>();
+    stmt->condition = parse_expression();
+    if (!stmt->condition) {
+        error_at_current("Expected condition expression after 'if'");
+        return nullptr;
+    }
+    
+    consume(TokenType::COLON, "Expected ':' after if condition");
+    
+    // Parse then body
+    parse_suite("if", stmt->then_body);
+    
+    // Parse elif branches
+    while (check(TokenType::ELIF)) {
+        advance(); // consume ELIF
+        std::unique_ptr<ExpressionNode> elif_cond = parse_expression();
+        if (!elif_cond) {
+            error_at_current("Expected condition expression after 'elif'");
+            break;
+        }
+        consume(TokenType::COLON, "Expected ':' after elif condition");
+        
+        std::vector<std::unique_ptr<StatementNode>> elif_body;
+        parse_suite("elif", elif_body);
+        stmt->elif_branches.push_back({std::move(elif_cond), std::move(elif_body)});
+    }
+    
+    // Parse else branch
+    if (check(TokenType::ELSE)) {
+        advance(); // consume ELSE
+        consume(TokenType::COLON, "Expected ':' after 'else'");
+        parse_suite("else", stmt->else_body);
+    }
+    
+    return stmt;
+}
+
+std::unique_ptr<WhileStatement> GDScriptParser::parse_while_statement() {
+    consume(TokenType::WHILE, "Expected 'while'");
+    
+    std::unique_ptr<WhileStatement> stmt = std::make_unique<WhileStatement>();
+    stmt->condition = parse_expression();
+    if (!stmt->condition) {
+        error_at_current("Expected condition expression after 'while'");
+        return nullptr;
+    }
+    
+    consume(TokenType::COLON, "Expected ':' after while condition");
+    
+    // Parse body
+    parse_suite("while", stmt->body);
+    
+    return stmt;
+}
+
+std::unique_ptr<ForStatement> GDScriptParser::parse_for_statement() {
+    consume(TokenType::FOR, "Expected 'for'");
+    
+    std::unique_ptr<ForStatement> stmt = std::make_unique<ForStatement>();
+    
+    // Variable name
+    if (!check(TokenType::IDENTIFIER)) {
+        error_at_current("Expected identifier for for loop variable");
+        return nullptr;
+    }
+    stmt->variable_name = current.literal;
+    advance();
+    
+    // "in" keyword
+    // Note: GDScript uses "in" but we might not have that token yet
+    // For now, assume the iterable expression follows
+    if (check(TokenType::IDENTIFIER) && current.literal == "in") {
+        advance(); // consume "in"
+    }
+    
+    // Iterable expression
+    stmt->iterable = parse_expression();
+    if (!stmt->iterable) {
+        error_at_current("Expected iterable expression after 'for'");
+        return nullptr;
+    }
+    
+    consume(TokenType::COLON, "Expected ':' after for loop");
+    
+    // Parse body
+    parse_suite("for", stmt->body);
+    
+    return stmt;
 }
 
 std::unique_ptr<ExpressionNode> GDScriptParser::parse_expression() {
@@ -345,8 +509,30 @@ std::unique_ptr<ExpressionNode> GDScriptParser::parse_primary() {
     }
     
     if (match(TokenType::IDENTIFIER)) {
-        return make_identifier(previous);
-                }
+        std::unique_ptr<ExpressionNode> expr = make_identifier(previous);
+        
+        // Check if this is a function call: identifier(...)
+        if (check(TokenType::PARENTHESIS_OPEN)) {
+            advance(); // consume '('
+            std::unique_ptr<CallExpr> call = std::make_unique<CallExpr>();
+            call->callee = std::move(expr);
+            
+            // Parse arguments
+            if (!check(TokenType::PARENTHESIS_CLOSE)) {
+                do {
+                    std::unique_ptr<ExpressionNode> arg = parse_expression();
+                    if (arg) {
+                        call->arguments.push_back(std::move(arg));
+                    }
+                } while (match(TokenType::COMMA));
+            }
+            
+            consume(TokenType::PARENTHESIS_CLOSE, "Expected ')' after function arguments");
+            return call;
+        }
+        
+        return expr;
+    }
     
     if (match(TokenType::PARENTHESIS_OPEN)) {
         std::unique_ptr<ExpressionNode> expr = parse_expression();

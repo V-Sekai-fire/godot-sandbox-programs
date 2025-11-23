@@ -50,6 +50,10 @@ private:
     // Statement parsing
     std::unique_ptr<ReturnStatement> parse_return_statement();
     std::unique_ptr<VariableDeclaration> parse_variable_declaration();
+    std::unique_ptr<AssignmentStatement> parse_assignment_statement();
+    std::unique_ptr<IfStatement> parse_if_statement();
+    std::unique_ptr<WhileStatement> parse_while_statement();
+    std::unique_ptr<ForStatement> parse_for_statement();
     
     // Helper to build AST nodes
     std::unique_ptr<LiteralExpr> make_literal(const Token& token);

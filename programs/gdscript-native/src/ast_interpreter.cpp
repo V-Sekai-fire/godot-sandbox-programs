@@ -253,6 +253,16 @@ void ASTInterpreter::_execute_statement(const StatementNode* stmt, Frame& frame)
             _execute_while_statement(static_cast<const WhileStatement*>(stmt), frame);
             break;
         
+        case ASTNode::NodeType::ExpressionStatement:
+            // Evaluate expression (for function calls, etc.) but don't use result
+            {
+                const ExpressionStatement* expr_stmt = static_cast<const ExpressionStatement*>(stmt);
+                if (expr_stmt->expression) {
+                    _evaluate_expression(expr_stmt->expression.get(), frame);
+                }
+            }
+            break;
+        
         default:
             break;
     }
@@ -288,11 +298,16 @@ void ASTInterpreter::_execute_assignment(const AssignmentStatement* assign, Fram
     const IdentifierExpr* target = static_cast<const IdentifierExpr*>(assign->target.get());
     Value value = _evaluate_expression(assign->value.get(), frame);
     
-    // Update in current frame or globals
-    if (frame.variables.find(target->name) != frame.variables.end()) {
-        frame.variables[target->name] = value;
-    } else {
-        _globals[target->name] = value;
+    // Update in current frame (always update/create in current frame for now)
+    // In a full implementation, we'd check parent frames for nested scopes
+    frame.variables[target->name] = value;
+    
+    // Also update the frame on the call stack if it exists
+    if (!_call_stack.empty()) {
+        Frame& stack_frame = _call_stack.back();
+        if (&stack_frame == &frame || stack_frame.function == frame.function) {
+            stack_frame.variables[target->name] = value;
+        }
     }
 }
 
@@ -418,9 +433,10 @@ ASTInterpreter::Value ASTInterpreter::_literal_to_value(const LiteralExpr* lit) 
     } else if (std::holds_alternative<double>(lit->value)) {
         return Value{std::get<double>(lit->value)};
     } else if (std::holds_alternative<bool>(lit->value)) {
-        return Value{std::get<bool>(lit->value)};
+        // Convert bool to int64_t for consistency (GDScript uses 1/0 for true/false)
+        return Value{std::get<bool>(lit->value) ? int64_t(1) : int64_t(0)};
     } else if (std::holds_alternative<std::nullptr_t>(lit->value)) {
-        return Value{nullptr};
+        return Value{int64_t(0)}; // null is 0 in GDScript
     } else if (std::holds_alternative<std::string>(lit->value)) {
         return Value{std::get<std::string>(lit->value)};
     }
