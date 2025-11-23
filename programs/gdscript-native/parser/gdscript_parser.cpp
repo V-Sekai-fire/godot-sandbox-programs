@@ -38,6 +38,25 @@ struct IfStmtData {
     std::vector<std::any> else_body; // Statements (optional)
 };
 
+// For statement data
+struct ForStmtData {
+    std::string variable_name;
+    std::any iterable; // Expression
+    std::vector<std::any> body; // Statements
+};
+
+// While statement data
+struct WhileStmtData {
+    std::any condition; // Expression
+    std::vector<std::any> body; // Statements
+};
+
+// Match statement data
+struct MatchStmtData {
+    std::any expression; // Expression
+    std::vector<std::pair<std::any, std::vector<std::any>>> branches; // (pattern, body)
+};
+
 // Function data
 struct FunctionData {
     std::string name;
@@ -52,6 +71,67 @@ struct ProgramData {
     std::vector<std::any> statements; // StatementNode or other
 };
 
+// Helper function to count indentation (spaces/tabs)
+static int count_indent(const std::string& line) {
+    int indent = 0;
+    for (char c : line) {
+        if (c == ' ') {
+            indent++;
+        } else if (c == '\t') {
+            indent += 4; // Convert tabs to 4 spaces
+        } else {
+            break;
+        }
+    }
+    return indent;
+}
+
+// Pre-process source to convert indentation to explicit block markers
+static std::string preprocess_indentation(const std::string& source) {
+    std::istringstream iss(source);
+    std::ostringstream oss;
+    std::vector<int> indent_stack = {0};
+    std::string line;
+    bool first_line = true;
+    
+    while (std::getline(iss, line)) {
+        // Count leading spaces/tabs
+        int indent = count_indent(line);
+        
+        // Handle dedent (close blocks)
+        while (indent_stack.size() > 1 && indent_stack.back() > indent) {
+            oss << "}\n"; // Close block
+            indent_stack.pop_back();
+        }
+        
+        // Check if line ends with ':' (block start)
+        // Trim trailing whitespace to check
+        std::string trimmed = line;
+        while (!trimmed.empty() && (trimmed.back() == ' ' || trimmed.back() == '\t')) {
+            trimmed.pop_back();
+        }
+        
+        if (!trimmed.empty() && trimmed.back() == ':') {
+            // This is a block start (if, elif, else, for, while, match, func, etc.)
+            oss << line << "\n"; // Keep original line
+            // Next line should be indented more
+            indent_stack.push_back(indent + 4); // Expect at least 4 spaces more
+        } else {
+            // Regular line
+            oss << line << "\n";
+        }
+        first_line = false;
+    }
+    
+    // Close remaining blocks
+    while (indent_stack.size() > 1) {
+        oss << "}\n";
+        indent_stack.pop_back();
+    }
+    
+    return oss.str();
+}
+
 // Basic GDScript grammar (PEG syntax)
 // Starting with simple subset: functions, returns, integer literals, identifiers
 // Note: GDScript uses indentation for blocks, but for now we'll use newlines
@@ -63,21 +143,28 @@ static const char* gdscript_grammar = R"(
     Parameters      <- Parameter (',' _ Parameter)*
     Parameter       <- Identifier (':' _ TypeHint)?
     ReturnType      <- TypeHint
-    Body            <- Statement+
+    Body            <- '{' _ Statement+ _ '}'
     
-    Statement       <- ReturnStmt / VarDeclStmt / AssignmentStmt / IfStmt / ExpressionStmt
+    Statement       <- ReturnStmt / VarDeclStmt / AssignmentStmt / IfStmt / ForStmt / WhileStmt / MatchStmt / ExpressionStmt
     ReturnStmt      <- 'return' _ Expression? _ NEWLINE
     VarDeclStmt     <- 'var' _ Identifier _ (':' _ TypeHint)? _ ('=' _ Expression)? _ NEWLINE
     AssignmentStmt  <- IdentifierExpr _ '=' _ Expression _ NEWLINE
     IfStmt          <- 'if' _ Expression _ ':' _ NEWLINE _ Body (ElifBranch)* (ElseBranch)?
     ElifBranch      <- 'elif' _ Expression _ ':' _ NEWLINE _ Body
     ElseBranch      <- 'else' _ ':' _ NEWLINE _ Body
+    ForStmt         <- 'for' _ Identifier _ 'in' _ Expression _ ':' _ NEWLINE _ Body
+    WhileStmt       <- 'while' _ Expression _ ':' _ NEWLINE _ Body
+    MatchStmt       <- 'match' _ Expression _ ':' _ NEWLINE _ MatchBranches
+    MatchBranches   <- MatchBranch+
+    MatchBranch     <- Pattern _ ':' _ NEWLINE _ Body
+    Pattern         <- Literal / Identifier / '_'
     ExpressionStmt  <- Expression _ NEWLINE
     
     Expression      <- BinaryExpr / UnaryExpr / PrimaryExpr
     BinaryExpr      <- PrimaryExpr _ BinaryOp _ Expression
     UnaryExpr       <- UnaryOp _ PrimaryExpr
-    PrimaryExpr     <- CallExpr / Literal / IdentifierExpr / '(' _ Expression _ ')'
+    PrimaryExpr     <- MemberAccessExpr / CallExpr / Literal / IdentifierExpr / '(' _ Expression _ ')'
+    MemberAccessExpr <- (CallExpr / Literal / IdentifierExpr / '(' _ Expression _ ')') _ '.' _ Identifier
     
     CallExpr        <- IdentifierExpr _ '(' _ Arguments? _ ')'
     Arguments       <- Expression (',' _ Expression)*
@@ -397,6 +484,155 @@ GDScriptParser::GDScriptParser() : last_program_data() {
         return data;
     };
     
+    // ForStmt
+    // Grammar: 'for' _ Identifier _ 'in' _ Expression _ ':' _ NEWLINE _ Body
+    (*p)["ForStmt"] = [](const peg::SemanticValues& sv) -> std::any {
+        ForStmtData data;
+        
+        // Find variable name (string from Identifier)
+        for (size_t i = 0; i < sv.size(); ++i) {
+            if (sv[i].has_value() && sv[i].type() == typeid(std::string)) {
+                data.variable_name = std::any_cast<std::string>(sv[i]);
+                break;
+            }
+        }
+        
+        // Find iterable expression (first non-string, non-vector value)
+        for (size_t i = 0; i < sv.size(); ++i) {
+            if (sv[i].has_value() && sv[i].type() != typeid(std::string) && 
+                sv[i].type() != typeid(std::vector<std::any>)) {
+                data.iterable = sv[i];
+                break;
+            }
+        }
+        
+        // Find body (vector<any>)
+        for (size_t i = 0; i < sv.size(); ++i) {
+            if (sv[i].has_value() && sv[i].type() == typeid(std::vector<std::any>)) {
+                data.body = std::any_cast<std::vector<std::any>>(sv[i]);
+                break;
+            }
+        }
+        
+        return data;
+    };
+    
+    // WhileStmt
+    // Grammar: 'while' _ Expression _ ':' _ NEWLINE _ Body
+    (*p)["WhileStmt"] = [](const peg::SemanticValues& sv) -> std::any {
+        WhileStmtData data;
+        
+        // Find condition (first non-vector value)
+        for (size_t i = 0; i < sv.size(); ++i) {
+            if (sv[i].has_value() && sv[i].type() != typeid(std::vector<std::any>)) {
+                data.condition = sv[i];
+                break;
+            }
+        }
+        
+        // Find body (vector<any>)
+        for (size_t i = 0; i < sv.size(); ++i) {
+            if (sv[i].has_value() && sv[i].type() == typeid(std::vector<std::any>)) {
+                data.body = std::any_cast<std::vector<std::any>>(sv[i]);
+                break;
+            }
+        }
+        
+        return data;
+    };
+    
+    // MatchStmt
+    // Grammar: 'match' _ Expression _ ':' _ NEWLINE _ MatchBranches
+    (*p)["MatchStmt"] = [](const peg::SemanticValues& sv) -> std::any {
+        MatchStmtData data;
+        
+        // Find expression (first non-vector value)
+        for (size_t i = 0; i < sv.size(); ++i) {
+            if (sv[i].has_value() && sv[i].type() != typeid(std::vector<std::pair<std::any, std::vector<std::any>>>)) {
+                data.expression = sv[i];
+                break;
+            }
+        }
+        
+        // Find branches (vector of pairs)
+        for (size_t i = 0; i < sv.size(); ++i) {
+            if (sv[i].has_value() && sv[i].type() == typeid(std::vector<std::pair<std::any, std::vector<std::any>>>)) {
+                data.branches = std::any_cast<std::vector<std::pair<std::any, std::vector<std::any>>>>(sv[i]);
+                break;
+            }
+        }
+        
+        return data;
+    };
+    
+    // MatchBranch
+    // Grammar: Pattern _ ':' _ NEWLINE _ Body
+    (*p)["MatchBranch"] = [](const peg::SemanticValues& sv) -> std::any {
+        std::pair<std::any, std::vector<std::any>> branch;
+        
+        // Find pattern (first non-vector value)
+        for (size_t i = 0; i < sv.size(); ++i) {
+            if (sv[i].has_value() && sv[i].type() != typeid(std::vector<std::any>)) {
+                branch.first = sv[i];
+                break;
+            }
+        }
+        
+        // Find body (vector<any>)
+        for (size_t i = 0; i < sv.size(); ++i) {
+            if (sv[i].has_value() && sv[i].type() == typeid(std::vector<std::any>)) {
+                branch.second = std::any_cast<std::vector<std::any>>(sv[i]);
+                break;
+            }
+        }
+        
+        return branch;
+    };
+    
+    // MatchBranches
+    (*p)["MatchBranches"] = [](const peg::SemanticValues& sv) -> std::any {
+        std::vector<std::pair<std::any, std::vector<std::any>>> branches;
+        for (size_t i = 0; i < sv.size(); ++i) {
+            if (sv[i].has_value() && sv[i].type() == typeid(std::pair<std::any, std::vector<std::any>>)) {
+                branches.push_back(std::any_cast<std::pair<std::any, std::vector<std::any>>>(sv[i]));
+            }
+        }
+        return branches;
+    };
+    
+    // Pattern (Literal / Identifier / '_')
+    (*p)["Pattern"] = [](const peg::SemanticValues& sv) -> std::any {
+        if (sv.size() > 0) {
+            return sv[0]; // Pass through literal, identifier, or '_'
+        }
+        return std::any();
+    };
+    
+    // MemberAccessExpr
+    // Grammar: (CallExpr / Literal / IdentifierExpr / '(' _ Expression _ ')') _ '.' _ Identifier
+    (*p)["MemberAccessExpr"] = [](const peg::SemanticValues& sv) -> std::any {
+        auto member = std::make_shared<MemberAccessExpr>();
+        
+        // Get object (first value)
+        if (sv.size() > 0 && sv[0].has_value()) {
+            // Convert to expression - this is a stub, proper conversion needed
+            // For now, just create an IdentifierExpr as placeholder
+            member->object = std::make_unique<IdentifierExpr>();
+            static_cast<IdentifierExpr*>(member->object.get())->name = "obj"; // Placeholder
+        }
+        
+        // Get member name (last value should be string from Identifier)
+        if (sv.size() > 1 && sv[sv.size() - 1].has_value()) {
+            try {
+                member->member = std::any_cast<std::string>(sv[sv.size() - 1]);
+            } catch (const std::bad_any_cast&) {
+                member->member = ""; // Placeholder
+            }
+        }
+        
+        return member;
+    };
+    
     // Statement (dispatches to return/var/expression)
     // ReturnStmt returns std::any (expression), others return shared_ptr<StatementNode>
     (*p)["Statement"] = [](const peg::SemanticValues& sv) -> std::any {
@@ -648,7 +884,21 @@ std::unique_ptr<ExpressionNode> convertExpression(const std::any& expr_any) {
                     // TODO: Convert arguments properly
                     return result;
                 } catch (const std::bad_any_cast& e4) {
-                    // Unknown type
+                    // Try MemberAccessExpr
+                    try {
+                        auto member = std::any_cast<std::shared_ptr<MemberAccessExpr>>(expr_any);
+                        auto result = std::make_unique<MemberAccessExpr>();
+                        result->member = member->member;
+                        // Convert object (stub - proper conversion needed)
+                        if (member->object) {
+                            // For now, create placeholder IdentifierExpr
+                            result->object = std::make_unique<IdentifierExpr>();
+                            static_cast<IdentifierExpr*>(result->object.get())->name = "obj";
+                        }
+                        return result;
+                    } catch (const std::bad_any_cast& e5) {
+                        // Unknown type
+                    }
                 }
             }
         }
@@ -789,6 +1039,123 @@ std::unique_ptr<IfStatement> convertIfStmt(const std::any& if_any) {
     return nullptr;
 }
 
+// Helper to convert ForStmtData to unique_ptr ForStatement
+std::unique_ptr<ForStatement> convertForStmt(const std::any& for_any) {
+    if (!for_any.has_value()) {
+        return nullptr;
+    }
+    
+    if (for_any.type() == typeid(ForStmtData)) {
+        auto data = std::any_cast<ForStmtData>(for_any);
+        auto result = std::make_unique<ForStatement>();
+        result->variable_name = data.variable_name;
+        result->iterable = convertExpression(data.iterable);
+        
+        // Convert body
+        for (const auto& stmt_any : data.body) {
+            std::unique_ptr<StatementNode> stmt;
+            if (stmt_any.type() == typeid(VarDeclData)) {
+                stmt = convertVarDecl(stmt_any);
+            } else if (stmt_any.type() == typeid(AssignmentData)) {
+                stmt = convertAssignment(stmt_any);
+            } else if (stmt_any.type() != typeid(std::shared_ptr<StatementNode>)) {
+                auto ret_stmt = std::make_unique<ReturnStatement>();
+                ret_stmt->value = convertExpression(stmt_any);
+                stmt = std::move(ret_stmt);
+            } else {
+                auto shared_stmt = std::any_cast<std::shared_ptr<StatementNode>>(stmt_any);
+                stmt = convertStatement(shared_stmt);
+            }
+            if (stmt) {
+                result->body.push_back(std::move(stmt));
+            }
+        }
+        
+        return result;
+    }
+    
+    return nullptr;
+}
+
+// Helper to convert WhileStmtData to unique_ptr WhileStatement
+std::unique_ptr<WhileStatement> convertWhileStmt(const std::any& while_any) {
+    if (!while_any.has_value()) {
+        return nullptr;
+    }
+    
+    if (while_any.type() == typeid(WhileStmtData)) {
+        auto data = std::any_cast<WhileStmtData>(while_any);
+        auto result = std::make_unique<WhileStatement>();
+        result->condition = convertExpression(data.condition);
+        
+        // Convert body
+        for (const auto& stmt_any : data.body) {
+            std::unique_ptr<StatementNode> stmt;
+            if (stmt_any.type() == typeid(VarDeclData)) {
+                stmt = convertVarDecl(stmt_any);
+            } else if (stmt_any.type() == typeid(AssignmentData)) {
+                stmt = convertAssignment(stmt_any);
+            } else if (stmt_any.type() != typeid(std::shared_ptr<StatementNode>)) {
+                auto ret_stmt = std::make_unique<ReturnStatement>();
+                ret_stmt->value = convertExpression(stmt_any);
+                stmt = std::move(ret_stmt);
+            } else {
+                auto shared_stmt = std::any_cast<std::shared_ptr<StatementNode>>(stmt_any);
+                stmt = convertStatement(shared_stmt);
+            }
+            if (stmt) {
+                result->body.push_back(std::move(stmt));
+            }
+        }
+        
+        return result;
+    }
+    
+    return nullptr;
+}
+
+// Helper to convert MatchStmtData to unique_ptr MatchStatement
+std::unique_ptr<MatchStatement> convertMatchStmt(const std::any& match_any) {
+    if (!match_any.has_value()) {
+        return nullptr;
+    }
+    
+    if (match_any.type() == typeid(MatchStmtData)) {
+        auto data = std::any_cast<MatchStmtData>(match_any);
+        auto result = std::make_unique<MatchStatement>();
+        result->expression = convertExpression(data.expression);
+        
+        // Convert branches
+        for (const auto& branch : data.branches) {
+            std::unique_ptr<ExpressionNode> pattern = convertExpression(branch.first);
+            std::vector<std::unique_ptr<StatementNode>> body;
+            for (const auto& stmt_any : branch.second) {
+                std::unique_ptr<StatementNode> stmt;
+                if (stmt_any.type() == typeid(VarDeclData)) {
+                    stmt = convertVarDecl(stmt_any);
+                } else if (stmt_any.type() == typeid(AssignmentData)) {
+                    stmt = convertAssignment(stmt_any);
+                } else if (stmt_any.type() != typeid(std::shared_ptr<StatementNode>)) {
+                    auto ret_stmt = std::make_unique<ReturnStatement>();
+                    ret_stmt->value = convertExpression(stmt_any);
+                    stmt = std::move(ret_stmt);
+                } else {
+                    auto shared_stmt = std::any_cast<std::shared_ptr<StatementNode>>(stmt_any);
+                    stmt = convertStatement(shared_stmt);
+                }
+                if (stmt) {
+                    body.push_back(std::move(stmt));
+                }
+            }
+            result->branches.push_back({std::move(pattern), std::move(body)});
+        }
+        
+        return result;
+    }
+    
+    return nullptr;
+}
+
 // Helper to convert shared_ptr StatementNode to unique_ptr
 std::unique_ptr<StatementNode> convertStatement(std::shared_ptr<StatementNode> stmt) {
     if (!stmt) return nullptr;
@@ -857,9 +1224,12 @@ std::unique_ptr<ProgramNode> GDScriptParser::parse(const std::string& source) {
     last_error_message.clear();
     _errors.clear();
     
+    // Pre-process indentation to convert to braces
+    std::string processed_source = preprocess_indentation(source);
+    
     // Parse with semantic actions
     std::any result;
-    bool success = p->parse(source, result);
+    bool success = p->parse(processed_source, result);
     
     if (!success) {
         // Store a generic error message (cpp-peglib doesn't expose detailed error info easily)
@@ -890,6 +1260,26 @@ std::unique_ptr<ProgramNode> GDScriptParser::parse(const std::string& source) {
                 // Check if it's VarDeclData
                 if (stmt_any.type() == typeid(VarDeclData)) {
                     stmt = convertVarDecl(stmt_any);
+                }
+                // Check if it's AssignmentData
+                else if (stmt_any.type() == typeid(AssignmentData)) {
+                    stmt = convertAssignment(stmt_any);
+                }
+                // Check if it's IfStmtData
+                else if (stmt_any.type() == typeid(IfStmtData)) {
+                    stmt = convertIfStmt(stmt_any);
+                }
+                // Check if it's ForStmtData
+                else if (stmt_any.type() == typeid(ForStmtData)) {
+                    stmt = convertForStmt(stmt_any);
+                }
+                // Check if it's WhileStmtData
+                else if (stmt_any.type() == typeid(WhileStmtData)) {
+                    stmt = convertWhileStmt(stmt_any);
+                }
+                // Check if it's MatchStmtData
+                else if (stmt_any.type() == typeid(MatchStmtData)) {
+                    stmt = convertMatchStmt(stmt_any);
                 }
                 // Check if it's a ReturnStmt (just expression any)
                 // ReturnStmt returns std::any (expression), so if it's not shared_ptr<StatementNode>, it's ReturnStmt
@@ -935,6 +1325,18 @@ std::unique_ptr<ProgramNode> GDScriptParser::parse(const std::string& source) {
             // Check if it's IfStmtData
             else if (stmt_any.type() == typeid(IfStmtData)) {
                 stmt = convertIfStmt(stmt_any);
+            }
+            // Check if it's ForStmtData
+            else if (stmt_any.type() == typeid(ForStmtData)) {
+                stmt = convertForStmt(stmt_any);
+            }
+            // Check if it's WhileStmtData
+            else if (stmt_any.type() == typeid(WhileStmtData)) {
+                stmt = convertWhileStmt(stmt_any);
+            }
+            // Check if it's MatchStmtData
+            else if (stmt_any.type() == typeid(MatchStmtData)) {
+                stmt = convertMatchStmt(stmt_any);
             }
             // Check if it's a shared_ptr<StatementNode>
             else if (stmt_any.type() == typeid(std::shared_ptr<StatementNode>)) {

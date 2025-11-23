@@ -24,6 +24,7 @@ public:
         IfStatement,
         ForStatement,
         WhileStatement,
+        MatchStatement,
         VariableDeclaration,
         AssignmentStatement,
         ExpressionStatement,
@@ -112,6 +113,15 @@ public:
     std::vector<std::unique_ptr<StatementNode>> body;
     
     NodeType get_type() const override { return NodeType::WhileStatement; }
+};
+
+// Match statement: match expr: pattern1: ... pattern2: ...
+class MatchStatement : public StatementNode {
+public:
+    std::unique_ptr<ExpressionNode> expression;
+    std::vector<std::pair<std::unique_ptr<ExpressionNode>, std::vector<std::unique_ptr<StatementNode>>>> branches; // (pattern, body)
+    
+    NodeType get_type() const override { return NodeType::MatchStatement; }
 };
 
 // Variable declaration: var name [= expression]
