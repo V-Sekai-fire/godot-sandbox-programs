@@ -21,6 +21,7 @@ set(COMPILER_SOURCES
     ../src/ast_to_riscv_biscuit.cpp
     ../src/function_registry.cpp
     ../src/code_memory_manager.cpp
+    ../src/elf_generator.cpp
     # Add biscuit source files for linking
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../ext/biscuit/src/assembler.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../ext/biscuit/src/assembler_compressed.cpp
@@ -89,32 +90,54 @@ add_executable(test_compiler_execution
     ${COMPILER_SOURCES}
 )
 
-# Add biscuit include for compiler tests
+# Add biscuit and libriscv includes for compiler tests
 target_include_directories(test_compiler_basic PRIVATE 
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../ext/biscuit/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../ext/libriscv/lib
 )
 target_include_directories(test_compiler_operators PRIVATE 
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../ext/biscuit/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../ext/libriscv/lib
 )
 target_include_directories(test_compiler_system PRIVATE 
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../ext/biscuit/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../ext/libriscv/lib
 )
 target_include_directories(test_compiler_codegen PRIVATE 
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../ext/biscuit/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../ext/libriscv/lib
 )
 target_include_directories(test_compiler_integration PRIVATE 
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../ext/biscuit/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../ext/libriscv/lib
 )
 target_include_directories(test_compiler_features PRIVATE 
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../ext/biscuit/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../ext/libriscv/lib
 )
 target_include_directories(test_compiler_execution PRIVATE 
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../ext/biscuit/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../ext/libriscv/lib
 )
+
+# Debug simple test
+add_executable(test_debug_simple
+    test_debug_simple.cpp
+    ${COMPILER_SOURCES}
+)
+
+target_include_directories(test_debug_simple PRIVATE 
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../ext/biscuit/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../ext/libriscv/lib
+)
+
+# Link libriscv library for test_debug_simple (reuse the one from test_end_to_end_features)
+target_link_libraries(test_debug_simple riscv)
 
 # Set C++20 standard for compiler tests
 set_target_properties(test_compiler_basic test_compiler_operators test_compiler_system 
-    test_compiler_codegen test_compiler_integration test_compiler_features test_compiler_execution PROPERTIES
+    test_compiler_codegen test_compiler_integration test_compiler_features test_compiler_execution
+    test_debug_simple PROPERTIES
     CXX_STANDARD 20
     CXX_STANDARD_REQUIRED ON
 )
@@ -145,7 +168,7 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../../ext/libriscv/lib
     ${CMAKE_CURRENT_BINARY_DIR}/libriscv_build
     EXCLUDE_FROM_ALL)
 
-# Link the riscv target
+# Link the riscv target (C++ library)
 target_link_libraries(test_end_to_end_features riscv)
 
 # macOS: Link Security framework (required for libriscv syscalls)
@@ -153,6 +176,14 @@ if(APPLE)
     find_library(SECURITY_FRAMEWORK Security)
     if(SECURITY_FRAMEWORK)
         target_link_libraries(test_end_to_end_features ${SECURITY_FRAMEWORK})
+        target_link_libraries(test_debug_simple ${SECURITY_FRAMEWORK})
+        target_link_libraries(test_compiler_basic ${SECURITY_FRAMEWORK})
+        target_link_libraries(test_compiler_operators ${SECURITY_FRAMEWORK})
+        target_link_libraries(test_compiler_system ${SECURITY_FRAMEWORK})
+        target_link_libraries(test_compiler_codegen ${SECURITY_FRAMEWORK})
+        target_link_libraries(test_compiler_integration ${SECURITY_FRAMEWORK})
+        target_link_libraries(test_compiler_features ${SECURITY_FRAMEWORK})
+        target_link_libraries(test_compiler_execution ${SECURITY_FRAMEWORK})
     endif()
 endif()
 
@@ -185,7 +216,6 @@ set_target_properties(test_runner PROPERTIES
 target_include_directories(test_runner PRIVATE 
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../ext/biscuit/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../ext/libriscv/lib
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../ext/libriscv/lib/build
 )
 
 # Link libriscv library for test runner

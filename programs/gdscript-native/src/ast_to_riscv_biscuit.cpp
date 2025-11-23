@@ -72,20 +72,35 @@ void ASTToRISCVEmitter::_emit_function(const FunctionNode* func) {
     
     _stack_offset = static_cast<int>(func->parameters.size() * 8);
     
+    // Create epilogue label for return statements to jump to
+    std::unique_ptr<biscuit::Label> epilogue_label = std::make_unique<biscuit::Label>();
+    biscuit::Label* epilogue_ptr = epilogue_label.get();
+    _labels.push_back(std::move(epilogue_label));
+    _current_epilogue_label = epilogue_ptr;
+    
     // Emit function body
     for (const std::unique_ptr<StatementNode>& stmt : func->body) {
         _emit_statement(stmt.get());
     }
     
-    // Function epilogue: exit via syscall (for entry point functions)
-    // Default return value is 0 if no explicit return statement
-    // Note: a0 may already contain return value from explicit return statement
+    // If we fall through here (no return statement), set default return value
+    _assembler->LI(biscuit::a0, 0);  // Default return value
     
-    // For entry point functions called by libriscv, exit via syscall instead of returning
-    // Linux syscall: exit_group(a0) - syscall 94 (0x5e) for riscv64
-    // a0 already contains the return value (either from explicit return or default 0)
-    _assembler->LI(biscuit::a7, 94);  // syscall number for exit_group
-    _assembler->ECALL();               // Make syscall (exits program)
+    // Function epilogue: restore saved registers and return
+    // This is reached either from return statements (a0 already set) or from fall through (a0 = 0)
+    _assembler->Bind(epilogue_ptr);
+    
+    // Restore saved registers
+    _assembler->LD(biscuit::ra, stackSize - 8, biscuit::sp);
+    _assembler->LD(biscuit::s0, stackSize - 16, biscuit::sp);
+    
+    // Restore stack pointer
+    _assembler->ADDI(biscuit::sp, biscuit::sp, stackSize);
+    
+    // Return (JALR x0, 0(ra) - return to caller)
+    _assembler->JALR(biscuit::x0, 0, biscuit::ra);
+    
+    _current_epilogue_label = nullptr;
 }
 
 void ASTToRISCVEmitter::_emit_statement(const StatementNode* stmt) {
@@ -287,23 +302,52 @@ void ASTToRISCVEmitter::_emit_return(const ReturnStatement* ret) {
     }
     
     if (ret->value) {
-        // Emit return value expression
-        _emit_expression(ret->value.get());
-        
-        // Get register for return value
-        biscuit::GPR retReg = _get_or_allocate_register(ret->value.get());
-        
-        // Move to a0 (return value register)
-        if (retReg.Index() != biscuit::a0.Index()) {
-            _assembler->ADD(biscuit::a0, retReg, biscuit::zero);
+        // Optimize: if return value is a literal, emit directly to a0
+        if (ret->value->get_type() == ASTNode::NodeType::LiteralExpr) {
+            const LiteralExpr* lit = static_cast<const LiteralExpr*>(ret->value.get());
+            
+            // Emit literal directly to a0
+            if (std::holds_alternative<int64_t>(lit->value)) {
+                int64_t val = std::get<int64_t>(lit->value);
+                _assembler->LI(biscuit::a0, val);
+            } else if (std::holds_alternative<double>(lit->value)) {
+                double val = std::get<double>(lit->value);
+                _assembler->LI(biscuit::a0, static_cast<int64_t>(val));
+            } else if (std::holds_alternative<bool>(lit->value)) {
+                bool val = std::get<bool>(lit->value);
+                _assembler->LI(biscuit::a0, val ? 1 : 0);
+            } else {
+                // String or null - default to 0
+                _assembler->LI(biscuit::a0, 0);
+            }
+        } else {
+            // Complex expression - emit normally and move to a0
+            _emit_expression(ret->value.get());
+            
+            // Get register for return value
+            biscuit::GPR retReg = _get_or_allocate_register(ret->value.get());
+            
+            // Move to a0 (return value register)
+            if (retReg.Index() != biscuit::a0.Index()) {
+                _assembler->MV(biscuit::a0, retReg);
+            }
         }
+    } else {
+        // No return value - default to 0
+        _assembler->LI(biscuit::a0, 0);
     }
     
-    // For entry point functions, exit via syscall instead of returning
-    // Linux syscall: exit_group(a0) - syscall 94 (0x5e) for riscv64
-    // a0 already contains the return value
-    _assembler->LI(biscuit::a7, 94);  // syscall number for exit_group
-    _assembler->ECALL();               // Make syscall (exits program)
+    // Jump to function epilogue
+    if (_current_epilogue_label) {
+        _assembler->J(_current_epilogue_label);
+    } else {
+        // Fallback: emit epilogue inline (shouldn't happen)
+        int stackSize = _current_function_stack_size;
+        _assembler->LD(biscuit::ra, stackSize - 8, biscuit::sp);
+        _assembler->LD(biscuit::s0, stackSize - 16, biscuit::sp);
+        _assembler->ADDI(biscuit::sp, biscuit::sp, stackSize);
+        _assembler->JALR(biscuit::x0, 0, biscuit::ra);
+    }
 }
 
 void ASTToRISCVEmitter::_emit_assignment(const AssignmentStatement* assign) {
@@ -499,6 +543,7 @@ void ASTToRISCVEmitter::_reset_function_state() {
     _stack_offset = 0; // Will be set based on parameters in _emit_function
     _current_function_stack_size = 16; // Reset to minimum (saved regs only)
     _temp_reg_index = 0;
+    _current_epilogue_label = nullptr;
 }
 
 } // namespace gdscript

@@ -27,6 +27,7 @@ private:
     size_t _label_counter;
     size_t _temp_reg_index;
     const FunctionNode* _current_function; // Track current function being emitted
+    biscuit::Label* _current_epilogue_label; // Epilogue label for current function
     
     // Label management for control flow
     std::vector<std::unique_ptr<biscuit::Label>> _labels;
@@ -65,7 +66,8 @@ private:
     
 public:
     ASTToRISCVEmitter() : _stack_offset(0), _current_function_stack_size(16), 
-                          _label_counter(0), _temp_reg_index(0), _current_function(nullptr) {
+                          _label_counter(0), _temp_reg_index(0), _current_function(nullptr),
+                          _current_epilogue_label(nullptr) {
         _code_buffer.resize(8192); // Initial buffer size (will grow if needed)
     }
     

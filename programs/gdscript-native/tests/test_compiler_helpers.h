@@ -4,14 +4,18 @@
 #include "../src/parser/gdscript_parser.h"
 #include "../src/parser/ast.h"
 #include "../src/ast_to_riscv_biscuit.h"
+#include "../src/elf_generator.h"
 #include <string>
 #include <memory>
 #include <vector>
 #include <cstring>
-#include <sys/mman.h>
 #include <variant>
 #include <iostream>
 #include <sstream>
+
+// libriscv C++ API (avoid C API stdout conflict on macOS)
+#include <libriscv/machine.hpp>
+using namespace riscv;
 
 using namespace gdscript;
 
@@ -66,31 +70,59 @@ static inline CompilationResult compileGDScript(const std::string& source) {
     return result;
 }
 
-// Helper to execute generated RISC-V code and get result
+// Helper to execute generated RISC-V code and get result using libriscv C++ API
 static inline int64_t execute_generated_code(const uint8_t* code, size_t size) {
     if (code == nullptr || size == 0) {
         return 0;
     }
     
-    // Allocate executable memory with mmap
-    void* execMem = mmap(nullptr, size, PROT_READ | PROT_WRITE | PROT_EXEC, 
-                         MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    if (execMem == MAP_FAILED) {
+    // Generate ELF file from machine code
+    gdscript::ELFGenerator elf_gen;
+    elf_gen.add_code_section(code, size, ".text");
+    
+    // Add entry point symbol (function name from first function in program)
+    // For now, we'll use the default entry point
+    std::vector<uint8_t> elf_data = elf_gen.generate();
+    
+    if (elf_data.empty()) {
         return 0;
     }
     
-    // Copy code to executable memory
-    std::memcpy(execMem, code, size);
-    
-    // Cast to function pointer and call
-    using FuncPtr = int64_t(*)();
-    FuncPtr func = reinterpret_cast<FuncPtr>(execMem);
-    int64_t result = func();
-    
-    // Cleanup
-    munmap(execMem, size);
-    
-    return result;
+    try {
+        // Create RISC-V 64-bit machine from ELF
+        Machine<RISCV64> machine{elf_data, {.memory_max = 64ULL << 20}};
+        
+        // The entry point should be set during Machine construction (via cpu.reset())
+        // Get entry point from ELF
+        address_type<RISCV64> entry_point = machine.memory.start_address();
+        if (entry_point == 0) {
+            // Entry point not set - this shouldn't happen with a valid ELF
+            return 0;
+        }
+        
+        // Setup Linux environment (minimal - no arguments)
+        machine.setup_linux({"./program"}, {"LC_TYPE=C", "LC_ALL=C", "USER=root"});
+        machine.setup_linux_syscalls();
+        
+        // CRITICAL: After setup_linux(), the PC might be reset to 0
+        // We MUST explicitly jump to the entry point before simulating
+        // This is because setup_linux() sets up the stack and environment,
+        // but doesn't preserve the PC that was set during construction
+        // Use cpu.jump() to set PC to entry point
+        machine.cpu.jump(entry_point);
+        
+        // Run the program (timeout after 1M instructions)
+        // Use simulate_with<true>() to explicitly pass the entry point PC
+        // This ensures we start execution at the correct address
+        // The template parameter <true> means throw on timeout
+        machine.simulate_with<true>(1000000ULL, 0, entry_point);
+        
+        // Get return value from a0 register
+        return machine.return_value<int64_t>();
+    } catch (const std::exception& e) {
+        // Execution failed
+        return 0;
+    }
 }
 
 // Helper to print variant value for debugging

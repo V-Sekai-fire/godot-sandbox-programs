@@ -70,8 +70,11 @@ std::vector<uint8_t> ELFGenerator::generate() {
     uint64_t entry_point = text_sh_addr;
     
     // Program header sizes
-    size_t p_filesz = segment_size;  // File size: aligned segment (includes headers)
-    size_t p_memsz = code_size;      // Memory size: actual code only
+    // p_filesz: size of segment in file (aligned, includes headers + code)
+    size_t p_filesz = segment_size;
+    // p_memsz: size of segment in memory (aligned to page boundary, includes headers + code)
+    // For libriscv, p_memsz should match p_filesz for proper loading
+    size_t p_memsz = segment_size;
     
     // File layout: segment (headers + code) -> shstrtab -> section headers
     size_t shstrtab_offset = segment_size;
