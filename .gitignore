@@ -5,3 +5,8 @@
 *.a
 *.so
 .vscode/
+
+# Third-party build directories
+thirdparty/llvm-build/
+thirdparty/stablehlo/build/
+thirdparty/llvm-project/build/

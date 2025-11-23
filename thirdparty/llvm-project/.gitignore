@@ -1,0 +1,7 @@
+**/.build/
+**/.embedded/
+**/.zig/
+*.o
+*.a
+*.so
+.vscode/
