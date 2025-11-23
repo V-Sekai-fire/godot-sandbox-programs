@@ -34,20 +34,6 @@ jobs:
         sudo apt update
         sudo apt install -y build-essential cmake git
 
-    - name: Verify git subrepo dependencies
-      working-directory: ${{github.workspace}}
-      run: |
-        # Verify that git subrepo dependencies are present
-        if [ ! -d "ext/biscuit" ]; then
-          echo "ERROR: ext/biscuit not found (git subrepo dependency)"
-          exit 1
-        fi
-        if [ ! -d "ext/libriscv" ]; then
-          echo "ERROR: ext/libriscv not found (git subrepo dependency)"
-          exit 1
-        fi
-        echo "Git subrepo dependencies verified"
-
     - name: Build tests
       working-directory: ${{github.workspace}}
       run: |
