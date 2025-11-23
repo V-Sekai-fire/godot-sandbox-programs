@@ -1,4 +1,3 @@
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
 #include "test_compiler_helpers.h"
 #include "../src/function_registry.h"
@@ -6,7 +5,9 @@
 
 TEST_SUITE("Compiler - Error Handling") {
     TEST_CASE("Handle invalid syntax gracefully") {
-        std::string source = "func test():\n    invalid syntax here\n";
+        std::string source = R"(func test():
+    invalid syntax here
+)";
         auto result = compileGDScript(source);
         
         // Should fail gracefully with error message
@@ -24,7 +25,9 @@ TEST_SUITE("Compiler - Error Handling") {
     }
     
     TEST_CASE("Handle missing return statement") {
-        std::string source = "func test():\n    var x = 5\n";
+        std::string source = R"(func test():
+    var x = 5
+)";
         auto result = compileGDScript(source);
         
         // Should compile (function without return is valid)
@@ -34,7 +37,9 @@ TEST_SUITE("Compiler - Error Handling") {
 
 TEST_SUITE("Compiler - Function Registry Integration") {
     TEST_CASE("Register compiled function") {
-        std::string source = "func test():\n    return 42\n";
+        std::string source = R"(func test():
+    return 42
+)";
         auto result = compileGDScript(source);
         
         REQUIRE(result.success);
@@ -59,7 +64,9 @@ TEST_SUITE("Compiler - Function Registry Integration") {
     }
     
     TEST_CASE("Call registered function") {
-        std::string source = "func test():\n    return 42\n";
+        std::string source = R"(func test():
+    return 42
+)";
         auto result = compileGDScript(source);
         
         REQUIRE(result.success);
@@ -120,4 +127,3 @@ TEST_SUITE("Compiler - Memory Management") {
         }
     }
 }
-

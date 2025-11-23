@@ -1,4 +1,3 @@
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
 #include "../src/parser/gdscript_parser.h"
 #include "../src/parser/ast.h"

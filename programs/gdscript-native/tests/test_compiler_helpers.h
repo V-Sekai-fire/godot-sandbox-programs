@@ -23,7 +23,7 @@ struct CompilationResult {
     const uint8_t* get_code_ptr() const { return code.data(); }
 };
 
-inline CompilationResult compileGDScript(const std::string& source) {
+static inline CompilationResult compileGDScript(const std::string& source) {
     CompilationResult result;
     result.success = false;
     result.codeSize = 0;
@@ -59,7 +59,7 @@ inline CompilationResult compileGDScript(const std::string& source) {
 }
 
 // Helper to execute generated RISC-V code and get result
-inline int64_t execute_generated_code(const uint8_t* code, size_t size) {
+static inline int64_t execute_generated_code(const uint8_t* code, size_t size) {
     if (code == nullptr || size == 0) {
         return 0;
     }

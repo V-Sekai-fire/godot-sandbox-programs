@@ -1,10 +1,11 @@
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
 #include "test_compiler_helpers.h"
 
 TEST_SUITE("Compiler - Code Generation Quality") {
     TEST_CASE("Generated code size is reasonable") {
-        std::string source = "func test():\n    return 42\n";
+        std::string source = R"(func test():
+    return 42
+)";
         auto result = compileGDScript(source);
         
         REQUIRE(result.success);
@@ -17,9 +18,11 @@ TEST_SUITE("Compiler - Code Generation Quality") {
     }
     
     TEST_CASE("Multiple functions generate separate code") {
-        std::string source = 
-            "func func1():\n    return 1\n"
-            "func func2():\n    return 2\n";
+        std::string source = R"(func func1():
+    return 1
+func func2():
+    return 2
+)";
         
         auto result = compileGDScript(source);
         
@@ -29,8 +32,12 @@ TEST_SUITE("Compiler - Code Generation Quality") {
     }
     
     TEST_CASE("Complex expression generates more code") {
-        std::string simple = "func test():\n    return 1\n";
-        std::string complex = "func test():\n    return 1 + 2 * 3 - 4 / 2\n";
+        std::string simple = R"(func test():
+    return 1
+)";
+        std::string complex = R"(func test():
+    return 1 + 2 * 3 - 4 / 2
+)";
         
         auto simpleResult = compileGDScript(simple);
         auto complexResult = compileGDScript(complex);
@@ -42,4 +49,3 @@ TEST_SUITE("Compiler - Code Generation Quality") {
         CHECK(complexResult.codeSize >= simpleResult.codeSize);
     }
 }
-

@@ -1,4 +1,3 @@
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
 #include "../src/parser/gdscript_parser.h"
 #include "../src/ast_to_riscv_biscuit.h"
@@ -11,7 +10,9 @@ using namespace gdscript;
 
 TEST_SUITE("Compiler - Integration Tests") {
     TEST_CASE("Full compilation pipeline works") {
-        std::string source = "func add(a: int, b: int):\n    return a + b\n";
+        std::string source = R"(func add(a: int, b: int):
+    return a + b
+)";
         
         // Parse
         GDScriptParser parser;
@@ -42,7 +43,9 @@ TEST_SUITE("Compiler - Integration Tests") {
         GDScriptParser parser;
         REQUIRE(parser.is_valid());
         
-        std::string invalidSource = "func test():\n    invalid syntax\n";
+        std::string invalidSource = R"(func test():
+    invalid syntax
+)";
         auto ast = parser.parse(invalidSource);
         
         // Should have errors
@@ -52,4 +55,3 @@ TEST_SUITE("Compiler - Integration Tests") {
         }
     }
 }
-

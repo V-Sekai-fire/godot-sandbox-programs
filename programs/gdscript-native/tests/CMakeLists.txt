@@ -154,3 +154,33 @@ if(APPLE)
         target_link_libraries(test_end_to_end_features ${SECURITY_FRAMEWORK})
     endif()
 endif()
+
+# Test runner - runs all tests in a single executable
+add_executable(test_runner
+    test_runner.cpp
+    ${COMPILER_SOURCES}
+    ../src/elf_generator.cpp
+)
+
+# Set C++20 standard for test runner
+set_target_properties(test_runner PROPERTIES
+    CXX_STANDARD 20
+    CXX_STANDARD_REQUIRED ON
+)
+
+# Add biscuit include for test runner
+target_include_directories(test_runner PRIVATE 
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../ext/biscuit/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../ext/libriscv/lib
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../ext/libriscv/lib/build
+)
+
+# Link libriscv library for test runner
+target_link_libraries(test_runner riscv)
+
+# macOS: Link Security framework for test runner
+if(APPLE)
+    if(SECURITY_FRAMEWORK)
+        target_link_libraries(test_runner ${SECURITY_FRAMEWORK})
+    endif()
+endif()

@@ -1,10 +1,11 @@
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
 #include "test_compiler_helpers.h"
 
 TEST_SUITE("End-to-End Execution") {
     TEST_CASE("Execute simple return constant") {
-        std::string source = "func test():\n    return 42\n";
+        std::string source = R"(func test():
+    return 42
+)";
         auto result = compileGDScript(source);
         
         REQUIRE(result.success);
@@ -16,7 +17,9 @@ TEST_SUITE("End-to-End Execution") {
     }
     
     TEST_CASE("Execute simple addition") {
-        std::string source = "func add():\n    return 2 + 3\n";
+        std::string source = R"(func add():
+    return 2 + 3
+)";
         auto result = compileGDScript(source);
         
         REQUIRE(result.success);
@@ -27,7 +30,10 @@ TEST_SUITE("End-to-End Execution") {
     }
     
     TEST_CASE("Execute with variable") {
-        std::string source = "func test():\n    var x = 10\n    return x\n";
+        std::string source = R"(func test():
+    var x = 10
+    return x
+)";
         auto result = compileGDScript(source);
         
         REQUIRE(result.success);
@@ -38,7 +44,9 @@ TEST_SUITE("End-to-End Execution") {
     }
     
     TEST_CASE("Execute binary operations") {
-        std::string source = "func calc():\n    return 2 * 3 + 4\n";
+        std::string source = R"(func calc():
+    return 2 * 3 + 4
+)";
         auto result = compileGDScript(source);
         
         REQUIRE(result.success);
@@ -50,7 +58,9 @@ TEST_SUITE("End-to-End Execution") {
     }
     
     TEST_CASE("Execute comparison operator") {
-        std::string source = "func test():\n    return 5 == 5\n";
+        std::string source = R"(func test():
+    return 5 == 5
+)";
         auto result = compileGDScript(source);
         
         REQUIRE(result.success);
@@ -61,7 +71,9 @@ TEST_SUITE("End-to-End Execution") {
     }
     
     TEST_CASE("Execute function with parameters") {
-        std::string source = "func add(a: int, b: int):\n    return a + b\n";
+        std::string source = R"(func add(a: int, b: int):
+    return a + b
+)";
         auto result = compileGDScript(source);
         
         REQUIRE(result.success);
@@ -74,7 +86,12 @@ TEST_SUITE("End-to-End Execution") {
     }
     
     TEST_CASE("Execute if/else statement - true branch") {
-        std::string source = "func test():\n    if 5 > 3:\n        return 1\n    else:\n        return 0\n";
+        std::string source = R"(func test():
+    if 5 > 3:
+        return 1
+    else:
+        return 0
+)";
         auto result = compileGDScript(source);
         
         REQUIRE(result.success);
@@ -86,7 +103,12 @@ TEST_SUITE("End-to-End Execution") {
     }
     
     TEST_CASE("Execute if/else statement - false branch") {
-        std::string source = "func test():\n    if 3 > 5:\n        return 1\n    else:\n        return 0\n";
+        std::string source = R"(func test():
+    if 3 > 5:
+        return 1
+    else:
+        return 0
+)";
         auto result = compileGDScript(source);
         
         REQUIRE(result.success);
@@ -98,7 +120,11 @@ TEST_SUITE("End-to-End Execution") {
     }
     
     TEST_CASE("Execute assignment statement") {
-        std::string source = "func test():\n    var x = 5\n    x = 10\n    return x\n";
+        std::string source = R"(func test():
+    var x = 5
+    x = 10
+    return x
+)";
         auto result = compileGDScript(source);
         
         REQUIRE(result.success);
@@ -110,12 +136,12 @@ TEST_SUITE("End-to-End Execution") {
     }
     
     TEST_CASE("Execute if with assignment") {
-        std::string source = 
-            "func test():\n"
-            "    var x = 0\n"
-            "    if 5 > 3:\n"
-            "        x = 10\n"
-            "    return x\n";
+        std::string source = R"(func test():
+    var x = 0
+    if 5 > 3:
+        x = 10
+    return x
+)";
         auto result = compileGDScript(source);
         
         REQUIRE(result.success);
@@ -126,4 +152,3 @@ TEST_SUITE("End-to-End Execution") {
         CHECK(actual == 10);
     }
 }
-
