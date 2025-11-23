@@ -1,0 +1,12 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/ingydotnet/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/lioncash/biscuit
+	branch = main
+	commit = 1ed625d6d8d251d01a0cf2e28b00c73c52302b74
+	parent = 62aa8df39a0fd09fd0a19bffe350ca515a4b48b3
+	method = merge
+	cmdver = 0.4.9
