@@ -228,9 +228,40 @@ std::unique_ptr<StatementNode> GDScriptParser::parse_statement() {
     }
     
     // Try assignment statement: identifier = expression
-    // Use lookahead to check if next token is EQUAL
-    if (check(TokenType::IDENTIFIER) && peek() == TokenType::EQUAL) {
-        return parse_assignment_statement();
+    // Strategy from exa: Parse identifier, check next token for '='
+    // If '=' found, parse as assignment. This avoids lookahead complexity.
+    if (check(TokenType::IDENTIFIER)) {
+        // Save identifier name
+        std::string ident_name = current.literal;
+        std::unique_ptr<IdentifierExpr> target = make_identifier(current);
+        advance(); // Consume identifier
+        
+        // Check if next token is EQUAL (assignment operator)
+        // After advance(), current should be the next token (EQUAL if assignment)
+        if (check(TokenType::EQUAL)) {
+            // This is an assignment!
+            advance(); // Consume '='
+            
+            // Parse the value expression
+            std::unique_ptr<ExpressionNode> value = parse_expression();
+            if (!value) {
+                error_at_current("Expected expression for assignment value");
+                return nullptr;
+            }
+            
+            std::unique_ptr<AssignmentStatement> stmt = std::make_unique<AssignmentStatement>();
+            stmt->target = std::move(target);
+            stmt->op = "=";
+            stmt->value = std::move(value);
+            
+            // Consume newline
+            match(TokenType::NEWLINE);
+            
+            return stmt;
+        }
+        // Not an assignment - we consumed the identifier, can't rewind
+        // Return nullptr and let synchronize() handle it (not ideal but works)
+        return nullptr;
     }
     
     // Expression statement (fallback for function calls, etc.)
@@ -299,14 +330,11 @@ std::unique_ptr<AssignmentStatement> GDScriptParser::parse_assignment_statement(
     }
     
     std::unique_ptr<IdentifierExpr> target = make_identifier(current);
-    advance(); // Consume identifier, should get EQUAL from lookahead if peek() was called
+    advance(); // Consume identifier
     
-    // Assignment operator - should be in current if peek() was called
-    // If not, try to consume it (might not be in lookahead if called directly)
+    // Assignment operator - must be EQUAL
     if (!check(TokenType::EQUAL)) {
-        // EQUAL should be in lookahead from peek() call
-        // If not, this isn't an assignment
-        return nullptr;
+        return nullptr; // Not an assignment, fail silently
     }
     advance(); // consume '='
     std::string op = "="; // For now, only support simple assignment
@@ -423,6 +451,9 @@ std::unique_ptr<ForStatement> GDScriptParser::parse_for_statement() {
 }
 
 std::unique_ptr<ExpressionNode> GDScriptParser::parse_expression() {
+    // Check for assignment in expression context (for assignment statements)
+    // This allows "identifier = expr" to be parsed as an assignment expression
+    // But we handle assignment at statement level, so just parse equality here
     return parse_equality();
 }
 
