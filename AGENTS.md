@@ -11,25 +11,25 @@ GDScript Source Code
     ↓
 [cpp-peglib Parser] → AST (Abstract Syntax Tree)
     ↓
-[Direct AST to RISC-V Emitter] → RISC-V 64 Linux Assembly Text
-    ↓
-[Assembler (libRiscvAsmLib)] → RISC-V 64 Machine Code
+[Direct AST to RISC-V Emitter (biscuit)] → RISC-V 64 Machine Code
     ↓
 [Execute] → Register with Sandbox API
 ```
 
-**Note**: Following BEAM JIT pattern - no MLIR/StableHLO dependency. Direct code generation from AST to RISC-V 64 Linux.
+**Note**: Following BEAM JIT pattern - no MLIR/StableHLO dependency. Direct code generation from AST to RISC-V 64 Linux machine code using **biscuit** (similar to how BEAM JIT uses AsmJit).
 
 ## Current Implementation Status
 
 ### ✅ Completed Components
 
-1. **Direct AST to RISC-V 64 Linux Emitter** (Replaces MLIR/StableHLO)
-   - Direct code generation from AST (following BEAM JIT pattern)
+1. **Direct AST to RISC-V 64 Linux Emitter using biscuit** (Replaces MLIR/StableHLO)
+   - Direct code generation from AST to machine code (following BEAM JIT pattern)
+   - Uses **biscuit** library (MIT license) - similar to AsmJit used in BEAM JIT
    - No MLIR/StableHLO dependency - simpler and faster
-   - Handwritten RISC-V 64 Linux assembly templates (`ast_to_riscv.h/cpp`)
+   - Generates RISC-V 64 Linux machine code directly (`ast_to_riscv_biscuit.h/cpp`)
    - Follows RISC-V 64 Linux ABI and calling conventions
    - Supports: functions, returns, literals, identifiers, binary operations, variable declarations
+   - **Key advantage**: Generates machine code directly (like BEAM JIT), no text assembly step needed
 
 2. **Parser Grammar**
    - cpp-peglib integration (`parser/peglib.h`)
@@ -68,10 +68,11 @@ GDScript Source Code
    - **Known Issues**: 
      - cpp-peglib semantic value storage issue (workaround in place)
 
-2. **Direct AST to RISC-V 64 Linux Emitter** (COMPLETED)
+2. **Direct AST to RISC-V 64 Linux Emitter using biscuit** (COMPLETED)
    - **Status**: Fully implemented following BEAM JIT pattern
    - **Implementation**:
-     - Handwritten RISC-V assembly templates (`ast_to_riscv.h/cpp`)
+     - Uses **biscuit** library for direct machine code generation (`ast_to_riscv_biscuit.h/cpp`)
+     - Similar to how BEAM JIT uses AsmJit - generates machine code directly, not assembly text
      - Direct code generation from AST nodes (no MLIR/StableHLO dependency)
      - Follows RISC-V 64 Linux ABI and calling conventions
      - Proper stack frame management with dynamic stack size tracking
@@ -126,7 +127,7 @@ GDScript Source Code
 
 - **cpp-peglib**: Single-file header-only PEG parser (integrated)
 - **doctest**: Header-only testing framework (integrated)
-- **libRiscvAsmLib.a**: RISC-V assembler library (already integrated)
+- **biscuit**: RISC-V runtime code generator (MIT license) - similar to AsmJit, integrated via FetchContent
 
 ### Testing Tools (External)
 
@@ -271,7 +272,7 @@ programs/gdscript-native/
 │   ├── peglib.h        # cpp-peglib header
 │   ├── gdscript_parser.h/cpp
 │   └── ast.h           # AST node definitions
-├── ast_to_riscv.h/cpp  # Direct AST to RISC-V 64 Linux emitter
+├── ast_to_riscv_biscuit.h/cpp  # Direct AST to RISC-V 64 Linux emitter (using biscuit)
 ├── test_data_loader.h/cpp
 ├── test_riscv_assembly.sh  # Test script for external RISC-V toolchain
 ├── main.cpp

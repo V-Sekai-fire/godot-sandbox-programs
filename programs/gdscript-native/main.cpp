@@ -4,18 +4,12 @@
 #include <memory>
 #include <sstream>
 
-// Direct AST to RISC-V emitter (no MLIR/StableHLO dependency)
-#include "ast_to_riscv.h"
+// Direct AST to RISC-V emitter using biscuit (following BEAM JIT pattern)
+#include "ast_to_riscv_biscuit.h"
 #include "test_data_loader.h"
 #include "parser/gdscript_parser.h"
 
 using AsmCallback = Variant(*)();
-
-struct AsmjitResult {
-	unsigned char *data;
-	size_t size;
-};
-extern "C" struct AsmjitResult assemble_to(const char *input, size_t size);
 
 // Compile a simple GDScript-like function to RISC-V and return a callable
 static Variant compile_gdscript(String gdscript_code) {
@@ -35,12 +29,12 @@ static Variant compile_gdscript(String gdscript_code) {
 		return Nil;
 	}
 	
-	// Convert AST directly to RISC-V assembly (no MLIR/StableHLO)
+	// Convert AST directly to RISC-V machine code using biscuit (like BEAM JIT with AsmJit)
 	gdscript::ASTToRISCVEmitter emitter;
-	std::string assembly = emitter.emit(ast.get());
+	auto [machineCode, codeSize] = emitter.emit(ast.get());
 	
-	if (assembly.empty()) {
-		print("Error: Failed to emit RISC-V assembly\n");
+	if (machineCode == nullptr || codeSize == 0) {
+		print("Error: Failed to emit RISC-V machine code\n");
 		return Nil;
 	}
 	
@@ -48,15 +42,10 @@ static Variant compile_gdscript(String gdscript_code) {
 	if (!ast->functions.empty()) {
 		print("First function: ", ast->functions[0]->name.c_str(), "\n");
 	}
+	print("Generated ", codeSize, " bytes of RISC-V machine code\n");
 	
-	AsmjitResult result = assemble_to(assembly.c_str(), assembly.size());
-	
-	if (result.data == nullptr || result.size == 0) {
-		print("Error: Failed to assemble RISC-V code\n");
-		return Nil;
-	}
-	
-	void *executable = mmap(nullptr, result.size, PROT_READ | PROT_WRITE | PROT_EXEC, 
+	// Allocate executable memory and copy machine code (like BEAM JIT)
+	void *executable = mmap(nullptr, codeSize, PROT_READ | PROT_WRITE | PROT_EXEC, 
 	                       MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 	
 	if (executable == MAP_FAILED) {
@@ -64,7 +53,7 @@ static Variant compile_gdscript(String gdscript_code) {
 		return Nil;
 	}
 	
-	std::memcpy(executable, result.data, result.size);
+	std::memcpy(executable, machineCode, codeSize);
 	AsmCallback callback = (AsmCallback)executable;
 	return Callable::Create<Variant()>(callback);
 }
