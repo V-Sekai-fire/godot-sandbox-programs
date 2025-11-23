@@ -27,20 +27,38 @@ jobs:
     - uses: actions/checkout@v4
       with:
         submodules: false
+        # Git subrepo dependencies are already embedded in the repo
 
     - name: Install dependencies
       run: |
         sudo apt update
         sudo apt install -y build-essential cmake git
 
+    - name: Verify git subrepo dependencies
+      working-directory: ${{github.workspace}}
+      run: |
+        # Verify that git subrepo dependencies are present
+        if [ ! -d "ext/biscuit" ]; then
+          echo "ERROR: ext/biscuit not found (git subrepo dependency)"
+          exit 1
+        fi
+        if [ ! -d "ext/libriscv" ]; then
+          echo "ERROR: ext/libriscv not found (git subrepo dependency)"
+          exit 1
+        fi
+        echo "Git subrepo dependencies verified"
+
     - name: Build tests
       working-directory: ${{github.workspace}}
       run: |
+        # Disable RISCV binary translation to avoid FetchContent for tinycc
+        # Dependencies are already available via git subrepo in ext/
         cmake -B build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DRISCV_BINARY_TRANSLATION=OFF -DRISCV_LIBTCC=OFF
         if [ $? -ne 0 ]; then
           echo "ERROR: CMake configuration failed"
           exit 1
         fi
+        # Build only the test targets we need (excluding test_end_to_end_features which requires libriscv)
         cmake --build build --target test_parser test_compiler test_dataset test_elf_generation --parallel 8
         if [ $? -ne 0 ]; then
           echo "ERROR: Test build failed"
