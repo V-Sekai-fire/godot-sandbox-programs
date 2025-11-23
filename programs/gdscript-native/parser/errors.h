@@ -39,38 +39,38 @@ public:
 // Error collection - supports multiple errors per compilation
 class ErrorCollection {
 private:
-    std::vector<CompilationError> errors;
-    size_t maxErrors; // Maximum errors to collect (0 = unlimited)
+    std::vector<CompilationError> _errors;
+    size_t _max_errors; // Maximum errors to collect (0 = unlimited)
     
 public:
-    ErrorCollection(size_t max = 100) : maxErrors(max) {}
+    ErrorCollection(size_t max = 100) : _max_errors(max) {}
     
     // Add an error
-    void addError(const CompilationError& error);
-    void addError(ErrorType type, const std::string& message, 
+    void add_error(const CompilationError& error);
+    void add_error(ErrorType type, const std::string& message, 
                  const SourceLocation& location = SourceLocation(),
                  const std::string& context = "");
     
     // Get all errors
-    const std::vector<CompilationError>& getErrors() const { return errors; }
+    const std::vector<CompilationError>& get_errors() const { return _errors; }
     
     // Check if there are any errors
-    bool hasErrors() const { return !errors.empty(); }
+    bool has_errors() const { return !_errors.empty(); }
     
     // Get error count
-    size_t getErrorCount() const { return errors.size(); }
+    size_t get_error_count() const { return _errors.size(); }
     
     // Get formatted error message (all errors)
-    std::string getFormattedMessage() const;
+    std::string get_formatted_message() const;
     
     // Get first error message (for compatibility)
-    std::string getFirstErrorMessage() const;
+    std::string get_first_error_message() const;
     
     // Clear all errors
-    void clear() { errors.clear(); }
+    void clear() { _errors.clear(); }
     
     // Get errors by type
-    std::vector<CompilationError> getErrorsByType(ErrorType type) const;
+    std::vector<CompilationError> get_errors_by_type(ErrorType type) const;
 };
 
 } // namespace gdscript

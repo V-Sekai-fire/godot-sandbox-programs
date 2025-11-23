@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 #include <unordered_map>
 #include <cstdint>
 
@@ -11,10 +12,10 @@ namespace gdscript {
 class FunctionRegistry {
 private:
     // Map function name to executable memory address
-    std::unordered_map<std::string, void*> functions;
+    std::unordered_map<std::string, void*> _functions;
     
     // Map function name to code size (for cleanup)
-    std::unordered_map<std::string, size_t> functionSizes;
+    std::unordered_map<std::string, size_t> _function_sizes;
 
 public:
     FunctionRegistry() = default;
@@ -24,29 +25,29 @@ public:
     // name: Function name
     // address: Pointer to executable memory
     // size: Size of the code (for tracking)
-    void registerFunction(const std::string& name, void* address, size_t size);
+    void register_function(const std::string& name, void* address, size_t size);
     
     // Get function address by name
     // Returns nullptr if not found
-    void* getFunction(const std::string& name) const;
+    void* get_function(const std::string& name) const;
     
     // Check if function is registered
-    bool hasFunction(const std::string& name) const;
+    bool has_function(const std::string& name) const;
     
     // Get all registered function names
-    std::vector<std::string> getFunctionNames() const;
+    std::vector<std::string> get_function_names() const;
     
     // Clear all registered functions (does not free memory)
     void clear();
     
     // Get function size
-    size_t getFunctionSize(const std::string& name) const;
+    size_t get_function_size(const std::string& name) const;
 };
 
 // Helper function to call assembly function and get int64 result
-// funcAddr: Pointer to executable memory containing the function
+// func_addr: Pointer to executable memory containing the function
 // Returns: int64_t result from the function
-int64_t callAssemblyFunction(void* funcAddr);
+int64_t call_assembly_function(void* func_addr);
 
 } // namespace gdscript
 

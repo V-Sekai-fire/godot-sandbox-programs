@@ -41,7 +41,7 @@ public:
     };
 
     virtual ~ASTNode() = default;
-    virtual NodeType getType() const = 0;
+    virtual NodeType get_type() const = 0;
     
     // Source location for error reporting
     int line = 0;
@@ -54,7 +54,7 @@ public:
     std::vector<std::unique_ptr<FunctionNode>> functions;
     std::vector<std::unique_ptr<StatementNode>> statements;
     
-    NodeType getType() const override { return NodeType::Program; }
+    NodeType get_type() const override { return NodeType::Program; }
 };
 
 // Function definition
@@ -62,12 +62,12 @@ class FunctionNode : public ASTNode {
 public:
     std::string name;
     std::vector<std::pair<std::string, std::string>> parameters; // (name, type_hint)
-    std::string returnType; // Optional return type hint
+    std::string return_type; // Optional return type hint
     std::vector<std::unique_ptr<StatementNode>> body;
-    bool isStatic = false;
-    std::string rpcAnnotation; // "remote", "master", "puppet", etc.
+    bool is_static = false;
+    std::string rpc_annotation; // "remote", "master", "puppet", etc.
     
-    NodeType getType() const override { return NodeType::Function; }
+    NodeType get_type() const override { return NodeType::Function; }
 };
 
 // Base class for statements
@@ -81,28 +81,28 @@ class ReturnStatement : public StatementNode {
 public:
     std::unique_ptr<ExpressionNode> value; // nullptr if no return value
     
-    NodeType getType() const override { return NodeType::ReturnStatement; }
+    NodeType get_type() const override { return NodeType::ReturnStatement; }
 };
 
 // If/elif/else statement
 class IfStatement : public StatementNode {
 public:
     std::unique_ptr<ExpressionNode> condition;
-    std::vector<std::unique_ptr<StatementNode>> thenBody;
-    std::vector<std::pair<std::unique_ptr<ExpressionNode>, std::vector<std::unique_ptr<StatementNode>>>> elifBranches;
-    std::vector<std::unique_ptr<StatementNode>> elseBody;
+    std::vector<std::unique_ptr<StatementNode>> then_body;
+    std::vector<std::pair<std::unique_ptr<ExpressionNode>, std::vector<std::unique_ptr<StatementNode>>>> elif_branches;
+    std::vector<std::unique_ptr<StatementNode>> else_body;
     
-    NodeType getType() const override { return NodeType::IfStatement; }
+    NodeType get_type() const override { return NodeType::IfStatement; }
 };
 
 // For loop: for identifier in expression
 class ForStatement : public StatementNode {
 public:
-    std::string variableName;
+    std::string variable_name;
     std::unique_ptr<ExpressionNode> iterable;
     std::vector<std::unique_ptr<StatementNode>> body;
     
-    NodeType getType() const override { return NodeType::ForStatement; }
+    NodeType get_type() const override { return NodeType::ForStatement; }
 };
 
 // While loop
@@ -111,17 +111,17 @@ public:
     std::unique_ptr<ExpressionNode> condition;
     std::vector<std::unique_ptr<StatementNode>> body;
     
-    NodeType getType() const override { return NodeType::WhileStatement; }
+    NodeType get_type() const override { return NodeType::WhileStatement; }
 };
 
 // Variable declaration: var name [= expression]
 class VariableDeclaration : public StatementNode {
 public:
     std::string name;
-    std::string typeHint; // Optional type hint
+    std::string type_hint; // Optional type hint
     std::unique_ptr<ExpressionNode> initializer; // nullptr if no initializer
     
-    NodeType getType() const override { return NodeType::VariableDeclaration; }
+    NodeType get_type() const override { return NodeType::VariableDeclaration; }
 };
 
 // Assignment statement: target = expression (or +=, -=, etc.)
@@ -131,7 +131,7 @@ public:
     std::string op; // "=", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^="
     std::unique_ptr<ExpressionNode> value;
     
-    NodeType getType() const override { return NodeType::AssignmentStatement; }
+    NodeType get_type() const override { return NodeType::AssignmentStatement; }
 };
 
 // Expression statement (expression followed by newline/semicolon)
@@ -139,7 +139,7 @@ class ExpressionStatement : public StatementNode {
 public:
     std::unique_ptr<ExpressionNode> expression;
     
-    NodeType getType() const override { return NodeType::ExpressionStatement; }
+    NodeType get_type() const override { return NodeType::ExpressionStatement; }
 };
 
 // Base class for expressions
@@ -155,7 +155,7 @@ public:
     std::string op; // "+", "-", "*", "/", "%", "==", "!=", "<", ">", "<=", ">=", "and", "or", "in", etc.
     std::unique_ptr<ExpressionNode> right;
     
-    NodeType getType() const override { return NodeType::BinaryOpExpr; }
+    NodeType get_type() const override { return NodeType::BinaryOpExpr; }
 };
 
 // Unary operation: op expr
@@ -164,7 +164,7 @@ public:
     std::string op; // "-", "+", "!", "not", "~"
     std::unique_ptr<ExpressionNode> operand;
     
-    NodeType getType() const override { return NodeType::UnaryOpExpr; }
+    NodeType get_type() const override { return NodeType::UnaryOpExpr; }
 };
 
 // Function call: func(args) or obj.method(args)
@@ -173,7 +173,7 @@ public:
     std::unique_ptr<ExpressionNode> callee; // Function name or object.method
     std::vector<std::unique_ptr<ExpressionNode>> arguments;
     
-    NodeType getType() const override { return NodeType::CallExpr; }
+    NodeType get_type() const override { return NodeType::CallExpr; }
 };
 
 // Identifier (variable or function name)
@@ -181,7 +181,7 @@ class IdentifierExpr : public ExpressionNode {
 public:
     std::string name;
     
-    NodeType getType() const override { return NodeType::IdentifierExpr; }
+    NodeType get_type() const override { return NodeType::IdentifierExpr; }
 };
 
 // Literal value
@@ -190,7 +190,7 @@ public:
     // Use variant to store different literal types
     std::variant<int64_t, double, std::string, bool, std::nullptr_t> value;
     
-    NodeType getType() const override { return NodeType::LiteralExpr; }
+    NodeType get_type() const override { return NodeType::LiteralExpr; }
 };
 
 // Array literal: [expr, expr, ...]
@@ -198,7 +198,7 @@ class ArrayLiteralExpr : public ExpressionNode {
 public:
     std::vector<std::unique_ptr<ExpressionNode>> elements;
     
-    NodeType getType() const override { return NodeType::ArrayLiteralExpr; }
+    NodeType get_type() const override { return NodeType::ArrayLiteralExpr; }
 };
 
 // Dictionary literal: {key: value, ...} or {key = value, ...}
@@ -206,7 +206,7 @@ class DictionaryLiteralExpr : public ExpressionNode {
 public:
     std::vector<std::pair<std::unique_ptr<ExpressionNode>, std::unique_ptr<ExpressionNode>>> entries;
     
-    NodeType getType() const override { return NodeType::DictionaryLiteralExpr; }
+    NodeType get_type() const override { return NodeType::DictionaryLiteralExpr; }
 };
 
 // Member access: obj.member
@@ -215,7 +215,7 @@ public:
     std::unique_ptr<ExpressionNode> object;
     std::string member;
     
-    NodeType getType() const override { return NodeType::MemberAccessExpr; }
+    NodeType get_type() const override { return NodeType::MemberAccessExpr; }
 };
 
 // Subscript access: array[index]
@@ -224,26 +224,26 @@ public:
     std::unique_ptr<ExpressionNode> object;
     std::unique_ptr<ExpressionNode> index;
     
-    NodeType getType() const override { return NodeType::SubscriptExpr; }
+    NodeType get_type() const override { return NodeType::SubscriptExpr; }
 };
 
 // Type cast: expr as Type
 class TypeCastExpr : public ExpressionNode {
 public:
     std::unique_ptr<ExpressionNode> expression;
-    std::string targetType;
+    std::string target_type;
     
-    NodeType getType() const override { return NodeType::TypeCastExpr; }
+    NodeType get_type() const override { return NodeType::TypeCastExpr; }
 };
 
 // Ternary expression: condition if true_expr else false_expr
 class TernaryExpr : public ExpressionNode {
 public:
     std::unique_ptr<ExpressionNode> condition;
-    std::unique_ptr<ExpressionNode> trueExpr;
-    std::unique_ptr<ExpressionNode> falseExpr;
+    std::unique_ptr<ExpressionNode> true_expr;
+    std::unique_ptr<ExpressionNode> false_expr;
     
-    NodeType getType() const override { return NodeType::TernaryExpr; }
+    NodeType get_type() const override { return NodeType::TernaryExpr; }
 };
 
 } // namespace gdscript

@@ -101,18 +101,36 @@ GDScript Source Code
 GDScript → Callable → C++ Wrapper → Generated Assembly → int64 → Variant → GDScript
 ```
 
+**Status**: ✅ **IMPLEMENTED**
+
+**Implementation**:
+- `FunctionRegistry` class created (`function_registry.h/cpp`)
+- `callAssemblyFunction()` helper implemented
+- C++ wrapper generation in `compile_gdscript()`
+- Functions registered and wrappers created automatically
+- int64 → Variant conversion in wrappers
+
 **Future Considerations**:
 - For functions with parameters: May need syscall/helper approach
 - For complex return types: May need direct Variant construction in assembly
-- Function registry needed for inter-function calls
+- Inter-function calls: Function registry ready for this
 
 ## Architectural Improvements Needed
 
-### 1. Error Handling and Reporting
+### 1. Error Handling and Reporting ✅ **COMPLETED**
 
-**Current State**: Basic error messages, no structured error system.
+**Previous State**: Basic error messages, no structured error system.
 
-**Improvements Needed**:
+**Status**: ✅ **IMPLEMENTED**
+
+**Implementation**:
+- `CompilationError` class with ErrorType enum (Parse, Semantic, Codegen)
+- `SourceLocation` struct (line, column)
+- `ErrorCollection` class for multiple errors per compilation
+- Formatted error messages with source context
+- Integrated into parser (`parser/errors.h/cpp`)
+
+**Remaining Improvements**:
 - **Structured Error Types**: Create error hierarchy (ParseError, CompileError, RuntimeError)
 - **Error Context**: Include source location (line/column) in all errors
 - **Error Collection**: Support multiple errors per compilation (don't stop at first error)
@@ -130,11 +148,19 @@ class CompilationError {
 };
 ```
 
-### 2. Memory Management
+### 2. Memory Management ✅ **COMPLETED**
 
-**Current State**: `mmap` allocations in `main.cpp` are not tracked or cleaned up.
+**Previous State**: `mmap` allocations in `main.cpp` are not tracked or cleaned up.
 
-**Improvements Needed**:
+**Status**: ✅ **IMPLEMENTED**
+
+**Implementation**:
+- `CodeMemoryManager` class created (`code_memory_manager.h/cpp`)
+- `ExecutableMemory` RAII wrapper (auto cleanup with munmap)
+- All `mmap` allocations tracked in manager
+- Buffer growth strategy in `ASTToRISCVEmitter` (grows when 90% full)
+
+**Remaining Improvements**:
 - **Memory Tracking**: Track all executable memory allocations
 - **Cleanup Mechanism**: Provide way to free allocated memory
 - **Memory Pool**: Consider memory pool for code generation
@@ -145,19 +171,18 @@ class CompilationError {
 - Implement RAII wrapper for executable memory
 - Add buffer growth strategy in `ASTToRISCVEmitter`
 
-### 3. Code Organization and Cleanup
+### 3. Code Organization and Cleanup ✅ **COMPLETED**
 
-**Current State**: Legacy files exist but are not used:
-- `ast_to_ir.cpp/h` (MLIR-based, deprecated)
-- `ast_to_riscv.cpp/h` (old implementation?)
-- `mlir/` directory (MLIR integration, deprecated)
+**Previous State**: Legacy files existed but were not used.
 
-**Improvements Needed**:
-- **Remove or Document**: Either remove legacy files or clearly mark as deprecated
-- **Consolidate**: Ensure only one code generation path exists
-- **Clear Naming**: Use consistent naming (e.g., `ast_to_riscv_biscuit` is clear)
+**Status**: ✅ **IMPLEMENTED**
 
-**Action**: Create cleanup task to remove unused files or move to `deprecated/` directory.
+**Implementation**:
+- Moved `ast_to_ir.cpp/h` to `deprecated/` (MLIR-based, deprecated)
+- Moved `ast_to_riscv.cpp/h` to `deprecated/` (old assembly text emitter)
+- Moved `mlir/` directory to `deprecated/` (MLIR integration, deprecated)
+- Created `deprecated/README.md` explaining what was moved and why
+- Only one code generation path exists: `ast_to_riscv_biscuit.h/cpp`
 
 ### 4. Visitor Pattern for AST Traversal
 
@@ -317,25 +342,25 @@ struct CompilerOptions {
 
 ### 12. Function Call Support Architecture
 
-**Current State**: Function calls not implemented.
+**Current State**: Function registry implemented, function call code generation pending.
 
-**Improvements Needed**:
-- **Function Registry**: Track compiled functions
-- **Calling Convention**: Standardize function call protocol
-- **Function Lookup**: Resolve function names to addresses
-- **Inter-Function Calls**: Support calling other compiled functions
+**Status**: ⚠️ **PARTIALLY IMPLEMENTED**
 
-**Implementation**:
-- Add `FunctionRegistry` to track compiled functions
-- Implement function call code generation
-- Support both internal and external function calls
+**Completed**:
+- ✅ **Function Registry**: `FunctionRegistry` class tracks compiled functions (`function_registry.h/cpp`)
+- ✅ **Calling Convention**: C++ wrapper functions convert int64 → Variant
+- ✅ **Function Lookup**: `getFunction()` resolves function names to addresses
+
+**Remaining**:
+- **Function Call Code Generation**: Generate RISC-V code to call other functions
+- **Inter-Function Calls**: Support calling other compiled functions from generated code
 
 ## Priority Order for Architectural Improvements
 
-1. **High Priority** (Critical for functionality):
-   - Memory management (leak prevention)
-   - Error handling (better user experience)
-   - Code organization cleanup (reduce confusion)
+1. **High Priority** (Critical for functionality): ✅ **COMPLETED**
+   - ✅ Memory management (leak prevention) - **DONE**
+   - ✅ Error handling (better user experience) - **DONE**
+   - ✅ Code organization cleanup (reduce confusion) - **DONE**
 
 2. **Medium Priority** (Improves code quality):
    - Visitor pattern (better code organization)
@@ -414,12 +439,50 @@ struct CompilerOptions {
      - Binary operations (+, -, *, /, %)
      - Variable declarations with initializers
    - **Testing**: Test script created for external RISC-V toolchain validation
+   - **Supports (Updated)**: 
+     - Comparison operators (==, !=, <, >, <=, >=) ✅ **ADDED**
+     - Improved stack size calculation with dynamic tracking ✅ **IMPROVED**
+     - Improved register allocation with cleanup ✅ **IMPROVED**
    - **Missing**: 
      - Control flow (if/else, loops)
      - Function calls
      - Float literals (converted to int)
      - String literals
-     - Comparison operators
+
+### ✅ Newly Completed Components
+
+1. **Godot Sandbox Calling Convention** ✅ **COMPLETED**
+   - `FunctionRegistry` class to track compiled function addresses
+   - `callAssemblyFunction()` helper to call assembly and get int64 result
+   - C++ wrapper generation in `compile_gdscript()` that converts int64 → Variant
+   - Functions automatically registered and wrappers created
+   - Files: `function_registry.h/cpp`
+
+2. **Memory Management** ✅ **COMPLETED**
+   - `CodeMemoryManager` class to track executable memory allocations
+   - `ExecutableMemory` RAII wrapper for automatic cleanup (munmap)
+   - Buffer growth strategy in `ASTToRISCVEmitter` (grows when 90% full)
+   - All `mmap` allocations tracked and managed
+   - Files: `code_memory_manager.h/cpp`
+
+3. **Structured Error Handling** ✅ **COMPLETED**
+   - `CompilationError` class with error types (Parse, Semantic, Codegen)
+   - `ErrorCollection` class for multiple errors per compilation
+   - `SourceLocation` struct for line/column tracking
+   - Formatted error messages with source context
+   - Integrated into parser
+   - Files: `parser/errors.h/cpp`
+
+4. **Code Organization Cleanup** ✅ **COMPLETED**
+   - Legacy files moved to `deprecated/` directory
+   - Only one code generation path: `ast_to_riscv_biscuit.h/cpp`
+   - Clear documentation of deprecated files
+
+5. **RISC-V Emitter Improvements** ✅ **COMPLETED**
+   - Comparison operators implemented (==, !=, <, >, <=, >=)
+   - Stack size calculation improved with dynamic tracking
+   - Register allocation improved with cleanup notes
+   - Buffer growth strategy added
 
 ### ⚠️ Partially Implemented
 

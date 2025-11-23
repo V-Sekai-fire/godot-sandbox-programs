@@ -1,55 +1,56 @@
 #include "function_registry.h"
 #include <vector>
+#include <string>
 #include <algorithm>
 
 namespace gdscript {
 
-void FunctionRegistry::registerFunction(const std::string& name, void* address, size_t size) {
-    functions[name] = address;
-    functionSizes[name] = size;
+void FunctionRegistry::register_function(const std::string& name, void* address, size_t size) {
+    _functions[name] = address;
+    _function_sizes[name] = size;
 }
 
-void* FunctionRegistry::getFunction(const std::string& name) const {
-    auto it = functions.find(name);
-    if (it != functions.end()) {
+void* FunctionRegistry::get_function(const std::string& name) const {
+    auto it = _functions.find(name);
+    if (it != _functions.end()) {
         return it->second;
     }
     return nullptr;
 }
 
-bool FunctionRegistry::hasFunction(const std::string& name) const {
-    return functions.find(name) != functions.end();
+bool FunctionRegistry::has_function(const std::string& name) const {
+    return _functions.find(name) != _functions.end();
 }
 
-std::vector<std::string> FunctionRegistry::getFunctionNames() const {
+std::vector<std::string> FunctionRegistry::get_function_names() const {
     std::vector<std::string> names;
-    names.reserve(functions.size());
-    for (const auto& pair : functions) {
+    names.reserve(_functions.size());
+    for (const auto& pair : _functions) {
         names.push_back(pair.first);
     }
     return names;
 }
 
 void FunctionRegistry::clear() {
-    functions.clear();
-    functionSizes.clear();
+    _functions.clear();
+    _function_sizes.clear();
 }
 
-size_t FunctionRegistry::getFunctionSize(const std::string& name) const {
-    auto it = functionSizes.find(name);
-    if (it != functionSizes.end()) {
+size_t FunctionRegistry::get_function_size(const std::string& name) const {
+    auto it = _function_sizes.find(name);
+    if (it != _function_sizes.end()) {
         return it->second;
     }
     return 0;
 }
 
-int64_t callAssemblyFunction(void* funcAddr) {
+int64_t call_assembly_function(void* func_addr) {
     // Cast to function pointer that returns int64_t
     // The generated assembly follows RISC-V 64 Linux ABI:
     // - Returns int64_t in register a0
     // - Takes no parameters (for now)
     using FuncPtr = int64_t(*)();
-    FuncPtr func = reinterpret_cast<FuncPtr>(funcAddr);
+    FuncPtr func = reinterpret_cast<FuncPtr>(func_addr);
     
     // Call the function
     return func();

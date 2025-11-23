@@ -34,10 +34,10 @@ public:
     void* get() const { return ptr; }
     
     // Get size
-    size_t getSize() const { return size; }
+    size_t get_size() const { return size; }
     
     // Check if valid
-    bool isValid() const { return valid; }
+    bool is_valid() const { return valid; }
     
     // Copy data into executable memory
     void copy(const void* data, size_t dataSize);

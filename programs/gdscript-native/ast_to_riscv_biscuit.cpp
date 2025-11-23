@@ -12,43 +12,44 @@ std::pair<const uint8_t*, size_t> ASTToRISCVEmitter::emit(const ProgramNode* pro
     
     // Initialize biscuit assembler with our buffer
     // Biscuit assembler takes buffer and size, similar to AsmJit
-    assembler = std::make_unique<biscuit::Assembler>(codeBuffer.data(), codeBuffer.size());
+    _assembler = std::make_unique<biscuit::Assembler>(_code_buffer.data(), _code_buffer.size());
     
     // Emit all functions
     for (const auto& func : program->functions) {
-        emitFunction(func.get());
+        _emit_function(func.get());
         
         // Check if buffer needs to grow
-        size_t currentOffset = assembler->GetCursorOffset();
-        if (currentOffset >= codeBuffer.size() * 0.9) { // 90% full
+        size_t currentOffset = _assembler->GetCursorOffset();
+        if (currentOffset >= _code_buffer.size() * 0.9) { // 90% full
             // Grow buffer by 2x
-            size_t oldSize = codeBuffer.size();
-            size_t newSize = codeBuffer.size() * 2;
-            codeBuffer.resize(newSize);
+            size_t oldSize = _code_buffer.size();
+            size_t newSize = _code_buffer.size() * 2;
+            _code_buffer.resize(newSize);
             
             // Preserve existing code and recreate assembler
-            // The existing code is already in codeBuffer, we just need to update the assembler
+            // The existing code is already in _code_buffer, we just need to update the assembler
             // Note: biscuit assembler writes directly to buffer, so existing code is preserved
-            assembler = std::make_unique<biscuit::Assembler>(codeBuffer.data() + currentOffset, 
-                                                              codeBuffer.size() - currentOffset);
+            _assembler = std::make_unique<biscuit::Assembler>(_code_buffer.data() + currentOffset, 
+                                                              _code_buffer.size() - currentOffset);
         }
     }
     
     // Get the actual size of generated code
     // Biscuit writes directly to buffer, GetCursorOffset() returns current position
-    size_t codeSize = assembler->GetCursorOffset();
+    size_t codeSize = _assembler->GetCursorOffset();
     
-    assembler.reset();
+    _assembler.reset();
     
-    return {codeBuffer.data(), codeSize};
+    return {_code_buffer.data(), codeSize};
 }
 
-void ASTToRISCVEmitter::emitFunction(const FunctionNode* func) {
-    if (!func || !assembler) {
+void ASTToRISCVEmitter::_emit_function(const FunctionNode* func) {
+    if (!func || !_assembler) {
         return;
     }
     
-    resetFunctionState();
+    _current_function = func;
+    _reset_function_state();
     
     // RISC-V 64 Linux function prologue
     // Stack frame layout (RISC-V 64 ABI):
@@ -63,13 +64,13 @@ void ASTToRISCVEmitter::emitFunction(const FunctionNode* func) {
     // We'll track actual usage and adjust in epilogue
     int estimatedLocalVars = 64; // Estimate 8 local variables (8 bytes each)
     int stackSize = initialStackSize + estimatedLocalVars;
-    currentFunctionStackSize = stackSize;
+    _current_function_stack_size = stackSize;
     
     // Function prologue
-    assembler->ADDI(biscuit::GPR::SP, biscuit::GPR::SP, -stackSize);
-    assembler->SD(biscuit::GPR::RA, biscuit::GPR::SP, stackSize - 8);
-    assembler->SD(biscuit::GPR::S0, biscuit::GPR::SP, stackSize - 16);
-    assembler->ADDI(biscuit::GPR::S0, biscuit::GPR::SP, stackSize);
+    _assembler->ADDI(biscuit::GPR::SP, biscuit::GPR::SP, -stackSize);
+    _assembler->SD(biscuit::GPR::RA, biscuit::GPR::SP, stackSize - 8);
+    _assembler->SD(biscuit::GPR::S0, biscuit::GPR::SP, stackSize - 16);
+    _assembler->ADDI(biscuit::GPR::S0, biscuit::GPR::SP, stackSize);
     
     // RISC-V 64 Linux calling convention:
     // - Arguments: a0-a7 (x10-x17) for first 8 arguments
@@ -85,48 +86,48 @@ void ASTToRISCVEmitter::emitFunction(const FunctionNode* func) {
         std::string varName = param.first;
         // Arguments arrive in a0-a7, store them to stack for variable access
         int offset = 16 + static_cast<int>(i * 8); // Start after saved registers
-        assembler->SD(argRegs[i], biscuit::GPR::SP, offset);
-        varToStackOffset[varName] = offset;
+        _assembler->SD(argRegs[i], biscuit::GPR::SP, offset);
+        _var_to_stack_offset[varName] = offset;
     }
     
-    // Update stackOffset to account for parameters
-    stackOffset = static_cast<int>(func->parameters.size() * 8);
+    // Update _stack_offset to account for parameters
+    _stack_offset = static_cast<int>(func->parameters.size() * 8);
     
     // Emit function body
     for (const auto& stmt : func->body) {
-        emitStatement(stmt.get());
+        _emit_statement(stmt.get());
     }
     
     // Function epilogue (fallback if no explicit return)
     // RISC-V 64 Linux: return value should be in a0
-    assembler->LI(biscuit::GPR::A0, 0);  // Default return value 0
+    _assembler->LI(biscuit::GPR::A0, 0);  // Default return value 0
     
-    // Calculate actual stack size needed (same logic as emitReturn)
+    // Calculate actual stack size needed (same logic as _emit_return)
     int paramStackSize = static_cast<int>(func->parameters.size() * 8);
     int actualStackNeeded = 16 + paramStackSize;
-    if (stackOffset > paramStackSize) {
-        actualStackNeeded = 16 + stackOffset;
+    if (_stack_offset > paramStackSize) {
+        actualStackNeeded = 16 + _stack_offset;
     }
-    int actualStackSize = (actualStackNeeded > currentFunctionStackSize) ? actualStackNeeded : currentFunctionStackSize;
+    int actualStackSize = (actualStackNeeded > _current_function_stack_size) ? actualStackNeeded : _current_function_stack_size;
     
-    assembler->LD(biscuit::GPR::RA, biscuit::GPR::SP, actualStackSize - 8);
-    assembler->LD(biscuit::GPR::S0, biscuit::GPR::SP, actualStackSize - 16);
-    assembler->ADDI(biscuit::GPR::SP, biscuit::GPR::SP, actualStackSize);
-    assembler->RET();
+    _assembler->LD(biscuit::GPR::RA, biscuit::GPR::SP, actualStackSize - 8);
+    _assembler->LD(biscuit::GPR::S0, biscuit::GPR::SP, actualStackSize - 16);
+    _assembler->ADDI(biscuit::GPR::SP, biscuit::GPR::SP, actualStackSize);
+    _assembler->RET();
 }
 
-void ASTToRISCVEmitter::emitStatement(const StatementNode* stmt) {
-    if (!stmt || !assembler) {
+void ASTToRISCVEmitter::_emit_statement(const StatementNode* stmt) {
+    if (!stmt || !_assembler) {
         return;
     }
     
-    switch (stmt->getType()) {
+    switch (stmt->get_type()) {
         case ASTNode::NodeType::ReturnStatement:
-            emitReturn(static_cast<const ReturnStatement*>(stmt));
+            _emit_return(static_cast<const ReturnStatement*>(stmt));
             break;
         
         case ASTNode::NodeType::VariableDeclaration:
-            emitVariableDeclaration(static_cast<const VariableDeclaration*>(stmt));
+            _emit_variable_declaration(static_cast<const VariableDeclaration*>(stmt));
             break;
         
         // TODO: Add other statement types
@@ -135,26 +136,26 @@ void ASTToRISCVEmitter::emitStatement(const StatementNode* stmt) {
     }
     
     // Clean up registers after statement (simple liveness: expressions die at statement end)
-    // For now, we keep exprToReg entries for potential reuse, but could clear here
+    // For now, we keep _expr_to_reg entries for potential reuse, but could clear here
     // This is a simple approach - more sophisticated would track liveness
 }
 
-void ASTToRISCVEmitter::emitExpression(const ExpressionNode* expr) {
-    if (!expr || !assembler) {
+void ASTToRISCVEmitter::_emit_expression(const ExpressionNode* expr) {
+    if (!expr || !_assembler) {
         return;
     }
     
-    switch (expr->getType()) {
+    switch (expr->get_type()) {
         case ASTNode::NodeType::LiteralExpr:
-            emitLiteral(static_cast<const LiteralExpr*>(expr));
+            _emit_literal(static_cast<const LiteralExpr*>(expr));
             break;
         
         case ASTNode::NodeType::IdentifierExpr:
-            emitIdentifier(static_cast<const IdentifierExpr*>(expr));
+            _emit_identifier(static_cast<const IdentifierExpr*>(expr));
             break;
         
         case ASTNode::NodeType::BinaryOpExpr:
-            emitBinaryOp(static_cast<const BinaryOpExpr*>(expr));
+            _emit_binary_op(static_cast<const BinaryOpExpr*>(expr));
             break;
         
         // TODO: Add other expression types
@@ -163,243 +164,243 @@ void ASTToRISCVEmitter::emitExpression(const ExpressionNode* expr) {
     }
 }
 
-void ASTToRISCVEmitter::emitLiteral(const LiteralExpr* lit) {
-    if (!lit || !assembler) {
+void ASTToRISCVEmitter::_emit_literal(const LiteralExpr* lit) {
+    if (!lit || !_assembler) {
         return;
     }
     
-    biscuit::GPR reg = allocateRegister();
+    biscuit::GPR reg = _allocate_register();
     
     // Extract value from variant
     if (std::holds_alternative<int64_t>(lit->value)) {
         int64_t val = std::get<int64_t>(lit->value);
-        assembler->LI(reg, val);
+        _assembler->LI(reg, val);
     } else if (std::holds_alternative<double>(lit->value)) {
         // TODO: Handle float literals (for now, convert to int)
         double val = std::get<double>(lit->value);
-        assembler->LI(reg, static_cast<int64_t>(val));
+        _assembler->LI(reg, static_cast<int64_t>(val));
     } else if (std::holds_alternative<bool>(lit->value)) {
         bool val = std::get<bool>(lit->value);
-        assembler->LI(reg, val ? 1 : 0);
+        _assembler->LI(reg, val ? 1 : 0);
     } else if (std::holds_alternative<std::string>(lit->value)) {
         // TODO: Handle string literals
-        assembler->LI(reg, 0);
+        _assembler->LI(reg, 0);
     } else {
         // Null literal
-        assembler->LI(reg, 0);
+        _assembler->LI(reg, 0);
     }
     
     // Track register for this expression
-    exprToReg[lit] = reg;
+    _expr_to_reg[lit] = reg;
 }
 
-void ASTToRISCVEmitter::emitIdentifier(const IdentifierExpr* ident) {
-    if (!ident || !assembler) {
+void ASTToRISCVEmitter::_emit_identifier(const IdentifierExpr* ident) {
+    if (!ident || !_assembler) {
         return;
     }
     
     std::string varName = ident->name;
-    int offset = getVarStackOffset(varName);
-    biscuit::GPR reg = allocateRegister();
+    int offset = _get_var_stack_offset(varName);
+    biscuit::GPR reg = _allocate_register();
     
     // Load variable from stack
     if (offset >= 0) {
-        assembler->LD(reg, biscuit::GPR::SP, offset);
+        _assembler->LD(reg, biscuit::GPR::SP, offset);
     } else {
         // Variable not found - this is an error case
-        assembler->LI(reg, 0);
+        _assembler->LI(reg, 0);
     }
     
     // Track register for this expression
-    exprToReg[ident] = reg;
+    _expr_to_reg[ident] = reg;
 }
 
-void ASTToRISCVEmitter::emitBinaryOp(const BinaryOpExpr* binop) {
-    if (!binop || !binop->left || !binop->right || !assembler) {
+void ASTToRISCVEmitter::_emit_binary_op(const BinaryOpExpr* binop) {
+    if (!binop || !binop->left || !binop->right || !_assembler) {
         return;
     }
     
     // Emit left and right operands
-    emitExpression(binop->left.get());
-    emitExpression(binop->right.get());
+    _emit_expression(binop->left.get());
+    _emit_expression(binop->right.get());
     
     // Get registers for operands
-    biscuit::GPR leftReg = getOrAllocateRegister(binop->left.get());
-    biscuit::GPR rightReg = getOrAllocateRegister(binop->right.get());
-    biscuit::GPR resultReg = allocateRegister();
+    biscuit::GPR leftReg = _get_or_allocate_register(binop->left.get());
+    biscuit::GPR rightReg = _get_or_allocate_register(binop->right.get());
+    biscuit::GPR resultReg = _allocate_register();
     
     // Emit operation based on operator
     if (binop->op == "+") {
-        assembler->ADD(resultReg, leftReg, rightReg);
+        _assembler->ADD(resultReg, leftReg, rightReg);
     } else if (binop->op == "-") {
-        assembler->SUB(resultReg, leftReg, rightReg);
+        _assembler->SUB(resultReg, leftReg, rightReg);
     } else if (binop->op == "*") {
-        assembler->MUL(resultReg, leftReg, rightReg);
+        _assembler->MUL(resultReg, leftReg, rightReg);
     } else if (binop->op == "/") {
-        assembler->DIV(resultReg, leftReg, rightReg);
+        _assembler->DIV(resultReg, leftReg, rightReg);
     } else if (binop->op == "%") {
-        assembler->REM(resultReg, leftReg, rightReg);
+        _assembler->REM(resultReg, leftReg, rightReg);
     } else if (binop->op == "==") {
         // Equality: XOR the operands, result is 0 if equal
         // Then set result to 1 if XOR result is 0, else 0
-        assembler->XOR(resultReg, leftReg, rightReg);
+        _assembler->XOR(resultReg, leftReg, rightReg);
         // If resultReg == 0, set resultReg = 1, else resultReg = 0
         // Use: SLTIU resultReg, resultReg, 1 (sets to 1 if resultReg < 1, i.e., if resultReg == 0)
-        assembler->SLTIU(resultReg, resultReg, 1);
+        _assembler->SLTIU(resultReg, resultReg, 1);
     } else if (binop->op == "!=") {
         // Not equal: XOR the operands, result is non-zero if not equal
         // Then set result to 1 if XOR result != 0, else 0
-        assembler->XOR(resultReg, leftReg, rightReg);
+        _assembler->XOR(resultReg, leftReg, rightReg);
         // If resultReg != 0, set resultReg = 1, else resultReg = 0
         // Use: SLTU resultReg, zero, resultReg (sets to 1 if 0 < resultReg, i.e., if resultReg != 0)
-        assembler->SLTU(resultReg, biscuit::GPR::ZERO, resultReg);
+        _assembler->SLTU(resultReg, biscuit::GPR::ZERO, resultReg);
     } else if (binop->op == "<") {
         // Less than (signed)
-        assembler->SLT(resultReg, leftReg, rightReg);
+        _assembler->SLT(resultReg, leftReg, rightReg);
     } else if (binop->op == ">") {
         // Greater than (signed): swap operands for SLT
-        assembler->SLT(resultReg, rightReg, leftReg);
+        _assembler->SLT(resultReg, rightReg, leftReg);
     } else if (binop->op == "<=") {
         // Less than or equal: !(right < left), i.e., !(left > right)
         // Use: SLT temp, rightReg, leftReg, then XOR with 1
-        biscuit::GPR tempReg = allocateRegister();
-        assembler->SLT(tempReg, rightReg, leftReg);
+        biscuit::GPR tempReg = _allocate_register();
+        _assembler->SLT(tempReg, rightReg, leftReg);
         // Invert: resultReg = 1 - tempReg, or use XOR with 1
-        assembler->XORI(resultReg, tempReg, 1);
+        _assembler->XORI(resultReg, tempReg, 1);
     } else if (binop->op == ">=") {
         // Greater than or equal: !(left < right)
         // Use: SLT temp, leftReg, rightReg, then XOR with 1
-        biscuit::GPR tempReg = allocateRegister();
-        assembler->SLT(tempReg, leftReg, rightReg);
+        biscuit::GPR tempReg = _allocate_register();
+        _assembler->SLT(tempReg, leftReg, rightReg);
         // Invert: resultReg = 1 - tempReg
-        assembler->XORI(resultReg, tempReg, 1);
+        _assembler->XORI(resultReg, tempReg, 1);
     } else {
         // Unknown operator - default to 0
-        assembler->LI(resultReg, 0);
+        _assembler->LI(resultReg, 0);
     }
     
     // Store result register for this expression
-    exprToReg[binop] = resultReg;
+    _expr_to_reg[binop] = resultReg;
 }
 
-void ASTToRISCVEmitter::emitReturn(const ReturnStatement* ret) {
-    if (!ret || !assembler) {
+void ASTToRISCVEmitter::_emit_return(const ReturnStatement* ret) {
+    if (!ret || !_assembler || !_current_function) {
         return;
     }
     
     if (ret->value) {
         // Emit return value expression
-        emitExpression(ret->value.get());
+        _emit_expression(ret->value.get());
         
         // Get register for return value
-        biscuit::GPR retReg = getOrAllocateRegister(ret->value.get());
+        biscuit::GPR retReg = _get_or_allocate_register(ret->value.get());
         
         // Move to a0 (return value register)
         if (retReg != biscuit::GPR::A0) {
-            assembler->ADD(biscuit::GPR::A0, retReg, biscuit::GPR::ZERO);
+            _assembler->ADD(biscuit::GPR::A0, retReg, biscuit::GPR::ZERO);
         }
     }
     
     // Function epilogue - use the maximum of initial size and actual usage
-    // Calculate actual stack needed: saved regs (16) + max(stackOffset, paramStackSize)
-    int paramStackSize = static_cast<int>(func->parameters.size() * 8);
+    // Calculate actual stack needed: saved regs (16) + max(_stack_offset, paramStackSize)
+    int paramStackSize = static_cast<int>(_current_function->parameters.size() * 8);
     int actualStackNeeded = 16 + paramStackSize;
-    if (stackOffset > paramStackSize) {
-        actualStackNeeded = 16 + stackOffset;
+    if (_stack_offset > paramStackSize) {
+        actualStackNeeded = 16 + _stack_offset;
     }
     // Ensure we use at least the allocated size (can't shrink, but can use full allocation)
-    int actualStackSize = (actualStackNeeded > currentFunctionStackSize) ? actualStackNeeded : currentFunctionStackSize;
+    int actualStackSize = (actualStackNeeded > _current_function_stack_size) ? actualStackNeeded : _current_function_stack_size;
     
-    assembler->LD(biscuit::GPR::RA, biscuit::GPR::SP, actualStackSize - 8);
-    assembler->LD(biscuit::GPR::S0, biscuit::GPR::SP, actualStackSize - 16);
-    assembler->ADDI(biscuit::GPR::SP, biscuit::GPR::SP, actualStackSize);
-    assembler->RET();
+    _assembler->LD(biscuit::GPR::RA, biscuit::GPR::SP, actualStackSize - 8);
+    _assembler->LD(biscuit::GPR::S0, biscuit::GPR::SP, actualStackSize - 16);
+    _assembler->ADDI(biscuit::GPR::SP, biscuit::GPR::SP, actualStackSize);
+    _assembler->RET();
 }
 
-void ASTToRISCVEmitter::emitVariableDeclaration(const VariableDeclaration* varDecl) {
-    if (!varDecl || !assembler) {
+void ASTToRISCVEmitter::_emit_variable_declaration(const VariableDeclaration* varDecl) {
+    if (!varDecl || !_assembler) {
         return;
     }
     
     if (varDecl->initializer) {
         // Emit initializer expression
-        emitExpression(varDecl->initializer.get());
+        _emit_expression(varDecl->initializer.get());
         
         // Get register for initializer value
-        biscuit::GPR valueReg = getOrAllocateRegister(varDecl->initializer.get());
+        biscuit::GPR valueReg = _get_or_allocate_register(varDecl->initializer.get());
         
         // Allocate stack slot for variable
-        int varOffset = allocateStack(varDecl->name);
+        int varOffset = _allocate_stack(varDecl->name);
         
         // Store value to variable location
-        assembler->SD(valueReg, biscuit::GPR::SP, varOffset);
+        _assembler->SD(valueReg, biscuit::GPR::SP, varOffset);
     } else {
         // No initializer - just allocate stack slot
-        allocateStack(varDecl->name);
+        _allocate_stack(varDecl->name);
     }
 }
 
-biscuit::GPR ASTToRISCVEmitter::allocateRegister() {
-    if (tempRegIndex < numTempRegs) {
-        biscuit::GPR reg = tempRegs[tempRegIndex];
-        tempRegIndex = (tempRegIndex + 1) % numTempRegs;
+biscuit::GPR ASTToRISCVEmitter::_allocate_register() {
+    if (_temp_reg_index < _num_temp_regs) {
+        biscuit::GPR reg = _temp_regs[_temp_reg_index];
+        _temp_reg_index = (_temp_reg_index + 1) % _num_temp_regs;
         return reg;
     }
     
     // Out of registers - use stack (allocate a temp slot)
-    std::string tempName = "_temp_" + std::to_string(stackOffset);
-    allocateStack(tempName);
+    std::string tempName = "_temp_" + std::to_string(_stack_offset);
+    _allocate_stack(tempName);
     // Return a register that will be used to load from stack
-    return tempRegs[0]; // Will need special handling
+    return _temp_regs[0]; // Will need special handling
 }
 
-int ASTToRISCVEmitter::allocateStack(const std::string& varName) {
+int ASTToRISCVEmitter::_allocate_stack(const std::string& varName) {
     // Check if variable already allocated
-    if (varToStackOffset.find(varName) != varToStackOffset.end()) {
-        return varToStackOffset[varName];
+    if (_var_to_stack_offset.find(varName) != _var_to_stack_offset.end()) {
+        return _var_to_stack_offset[varName];
     }
     
     // Allocate new stack slot (8 bytes for 64-bit values)
-    int offset = 16 + stackOffset; // Start after saved registers
-    varToStackOffset[varName] = offset;
-    stackOffset += 8;
+    int offset = 16 + _stack_offset; // Start after saved registers
+    _var_to_stack_offset[varName] = offset;
+    _stack_offset += 8;
     
     // Update function stack size if needed (track maximum)
     // Note: We can't change the prologue after it's emitted, but we track for epilogue
-    int neededStackSize = 16 + stackOffset;
-    if (neededStackSize > currentFunctionStackSize) {
-        currentFunctionStackSize = neededStackSize;
+    int neededStackSize = 16 + _stack_offset;
+    if (neededStackSize > _current_function_stack_size) {
+        _current_function_stack_size = neededStackSize;
     }
     
     return offset;
 }
 
-biscuit::GPR ASTToRISCVEmitter::getOrAllocateRegister(const ExpressionNode* expr) {
-    auto it = exprToReg.find(expr);
-    if (it != exprToReg.end()) {
+biscuit::GPR ASTToRISCVEmitter::_get_or_allocate_register(const ExpressionNode* expr) {
+    auto it = _expr_to_reg.find(expr);
+    if (it != _expr_to_reg.end()) {
         return it->second;
     }
     // Expression not found - allocate a new register
-    // This shouldn't happen if emitExpression was called first
-    return allocateRegister();
+    // This shouldn't happen if _emit_expression was called first
+    return _allocate_register();
 }
 
-int ASTToRISCVEmitter::getVarStackOffset(const std::string& varName) {
-    auto it = varToStackOffset.find(varName);
-    if (it != varToStackOffset.end()) {
+int ASTToRISCVEmitter::_get_var_stack_offset(const std::string& varName) {
+    auto it = _var_to_stack_offset.find(varName);
+    if (it != _var_to_stack_offset.end()) {
         return it->second;
     }
     return -1; // Error case
 }
 
-void ASTToRISCVEmitter::resetFunctionState() {
-    exprToReg.clear();
-    // Keep varToStackOffset for function scope (contains function parameters)
-    // Reset stackOffset to account for parameters already stored
-    // Parameters are stored starting at offset 16, so stackOffset should start after them
-    stackOffset = 0; // Will be set based on parameters in emitFunction
-    currentFunctionStackSize = 16; // Reset to minimum (saved regs only)
-    tempRegIndex = 0;
+void ASTToRISCVEmitter::_reset_function_state() {
+    _expr_to_reg.clear();
+    // Keep _var_to_stack_offset for function scope (contains function parameters)
+    // Reset _stack_offset to account for parameters already stored
+    // Parameters are stored starting at offset 16, so _stack_offset should start after them
+    _stack_offset = 0; // Will be set based on parameters in _emit_function
+    _current_function_stack_size = 16; // Reset to minimum (saved regs only)
+    _temp_reg_index = 0;
 }
 
 } // namespace gdscript

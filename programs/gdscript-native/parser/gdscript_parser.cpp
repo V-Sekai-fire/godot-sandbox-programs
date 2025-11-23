@@ -20,7 +20,7 @@ struct BinaryOpData {
 // Variable declaration data
 struct VarDeclData {
     std::string name;
-    std::string typeHint;
+    std::string type_hint;
     std::any initializer; // Expression as any (shared_ptr<ExpressionNode> or BinaryOpData)
 };
 
@@ -28,7 +28,7 @@ struct VarDeclData {
 struct FunctionData {
     std::string name;
     std::vector<std::pair<std::string, std::string>> parameters;
-    std::string returnType;
+    std::string return_type;
     std::vector<std::any> body; // Statements as any
 };
 
@@ -214,7 +214,7 @@ GDScriptParser::GDScriptParser() : last_program_data() {
             if (sv[i].has_value() && sv[i].type() == typeid(std::string)) {
                 std::string str = std::any_cast<std::string>(sv[i]);
                 if (str != data.name) {
-                    data.typeHint = str;
+                    data.type_hint = str;
                     break;
                 }
             }
@@ -276,11 +276,11 @@ GDScriptParser::GDScriptParser() : last_program_data() {
     // Parameter
     (*p)["Parameter"] = [](const peg::SemanticValues& sv) -> std::any {
         std::string name = std::any_cast<std::string>(sv[0]);
-        std::string typeHint;
+        std::string type_hint;
         if (sv.size() > 1) {
-            typeHint = std::any_cast<std::string>(sv[1]);
+            type_hint = std::any_cast<std::string>(sv[1]);
         }
-        return std::make_pair(name, typeHint);
+        return std::make_pair(name, type_hint);
     };
     
     // Parameters
@@ -315,7 +315,7 @@ GDScriptParser::GDScriptParser() : last_program_data() {
                         found_name = true;
                     } else if (str != data.name) {
                         // This might be return type
-                        data.returnType = str;
+                        data.return_type = str;
                     }
                 } catch (...) {
                     continue;
@@ -410,14 +410,14 @@ GDScriptParser::~GDScriptParser() {
     }
 }
 
-bool GDScriptParser::isValid() const {
+bool GDScriptParser::is_valid() const {
     return parser != nullptr && static_cast<peg::parser*>(parser)->operator bool();
 }
 
 std::string GDScriptParser::getErrorMessage() const {
     // Return formatted error message from error collection if available
-    if (errors.hasErrors()) {
-        return errors.getFormattedMessage();
+    if (_errors.has_errors()) {
+        return _errors.get_formatted_message();
     }
     // Fallback to last_error_message for backward compatibility
     return last_error_message;
@@ -500,7 +500,7 @@ std::unique_ptr<StatementNode> convertStatement(std::shared_ptr<StatementNode> s
     } else if (auto var = std::dynamic_pointer_cast<VariableDeclaration>(stmt)) {
         auto result = std::make_unique<VariableDeclaration>();
         result->name = var->name;
-        result->typeHint = var->typeHint;
+        result->type_hint = var->type_hint;
         // var->initializer is unique_ptr in AST, but shared_ptr in semantic actions
         // This shouldn't happen - VariableDeclaration should be created from VarDeclData
         // For now, skip initializer
@@ -521,7 +521,7 @@ std::unique_ptr<VariableDeclaration> convertVarDecl(const std::any& varDecl_any)
         auto data = std::any_cast<VarDeclData>(varDecl_any);
         auto result = std::make_unique<VariableDeclaration>();
         result->name = data.name;
-        result->typeHint = data.typeHint;
+        result->type_hint = data.type_hint;
         
         // Convert initializer expression if present
         if (data.initializer.has_value()) {
@@ -535,9 +535,9 @@ std::unique_ptr<VariableDeclaration> convertVarDecl(const std::any& varDecl_any)
 }
 
 std::unique_ptr<ProgramNode> GDScriptParser::parse(const std::string& source) {
-    if (!isValid()) {
+    if (!is_valid()) {
         last_error_message = "Parser initialization failed";
-        errors.addError(ErrorType::Parse, "Parser initialization failed");
+        _errors.add_error(ErrorType::Parse, "Parser initialization failed");
         return nullptr;
     }
     
@@ -545,7 +545,7 @@ std::unique_ptr<ProgramNode> GDScriptParser::parse(const std::string& source) {
     
     // Clear previous error
     last_error_message.clear();
-    errors.clear();
+    _errors.clear();
     
     // Parse with semantic actions
     std::any result;
@@ -555,7 +555,7 @@ std::unique_ptr<ProgramNode> GDScriptParser::parse(const std::string& source) {
         // Store a generic error message (cpp-peglib doesn't expose detailed error info easily)
         // We could enhance this by using a custom log callback, but for now use a simple message
         last_error_message = "Parse error: Failed to parse GDScript source code";
-        errors.addError(ErrorType::Parse, "Failed to parse GDScript source code");
+        _errors.add_error(ErrorType::Parse, "Failed to parse GDScript source code");
         return nullptr;
     }
     
@@ -571,7 +571,7 @@ std::unique_ptr<ProgramNode> GDScriptParser::parse(const std::string& source) {
             auto func = std::make_unique<FunctionNode>();
             func->name = func_data.name;
             func->parameters = func_data.parameters;
-            func->returnType = func_data.returnType;
+            func->return_type = func_data.return_type;
             
             // Convert body statements
             for (const auto& stmt_any : func_data.body) {

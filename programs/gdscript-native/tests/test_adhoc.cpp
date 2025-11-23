@@ -13,7 +13,7 @@ void test_parse(const std::string& name, const std::string& source) {
     std::cout << "Source:\n" << source << "\n";
     
     GDScriptParser parser;
-    if (!parser.isValid()) {
+    if (!parser.is_valid()) {
         std::cout << "ERROR: Parser initialization failed!\n";
         return;
     }

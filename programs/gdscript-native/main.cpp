@@ -23,7 +23,7 @@ static gdscript::CodeMemoryManager g_memoryManager;
 static Variant compile_gdscript(String gdscript_code) {
 	// Parse GDScript code to AST
 	gdscript::GDScriptParser parser;
-	if (!parser.isValid()) {
+	if (!parser.is_valid()) {
 		print("Error: Parser initialization failed\n");
 		return Nil;
 	}
@@ -55,7 +55,7 @@ static Variant compile_gdscript(String gdscript_code) {
 	// Allocate executable memory using memory manager (RAII, auto cleanup)
 	gdscript::ExecutableMemory* execMem = g_memoryManager.allocate(codeSize);
 	
-	if (!execMem || !execMem->isValid()) {
+	if (!execMem || !execMem->is_valid()) {
 		print("Error: Failed to allocate executable memory\n");
 		return Nil;
 	}
@@ -72,19 +72,19 @@ static Variant compile_gdscript(String gdscript_code) {
 		if (funcName.empty()) {
 			funcName = "main";
 		}
-		g_functionRegistry.registerFunction(funcName, executable, codeSize);
+		g_functionRegistry.register_function(funcName, executable, codeSize);
 		print("Registered function: ", funcName.c_str(), "\n");
 		
 		// Create C++ wrapper that calls assembly and converts int64 to Variant
 		auto wrapper = [funcName]() -> Variant {
-			void* funcAddr = g_functionRegistry.getFunction(funcName);
+			void* funcAddr = g_functionRegistry.get_function(funcName);
 			if (!funcAddr) {
 				print("Error: Function not found in registry: ", funcName.c_str(), "\n");
 				return Nil;
 			}
 			
 			// Call assembly function and get int64 result
-			int64_t result = gdscript::callAssemblyFunction(funcAddr);
+			int64_t result = gdscript::call_assembly_function(funcAddr);
 			
 			// Convert int64 to Variant
 			return Variant(result);

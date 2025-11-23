@@ -24,7 +24,7 @@ private:
     ProgramData last_program_data;
     
     // Error collection
-    ErrorCollection errors;
+    ErrorCollection _errors;
     
     // Store last error message for retrieval (for backward compatibility)
     mutable std::string last_error_message;
@@ -51,11 +51,11 @@ public:
     std::string getErrorMessage() const;
     
     // Get error collection
-    const ErrorCollection& getErrors() const { return errors; }
-    ErrorCollection& getErrors() { return errors; }
+    const ErrorCollection& get_errors() const { return _errors; }
+    ErrorCollection& get_errors() { return _errors; }
     
     // Check if parser is valid
-    bool isValid() const;
+    bool is_valid() const;
 };
 
 } // namespace gdscript

@@ -3,27 +3,27 @@
 
 namespace gdscript {
 
-void ErrorCollection::addError(const CompilationError& error) {
-    if (maxErrors == 0 || errors.size() < maxErrors) {
-        errors.push_back(error);
+void ErrorCollection::add_error(const CompilationError& error) {
+    if (_max_errors == 0 || _errors.size() < _max_errors) {
+        _errors.push_back(error);
     }
 }
 
-void ErrorCollection::addError(ErrorType type, const std::string& message, 
+void ErrorCollection::add_error(ErrorType type, const std::string& message, 
                                const SourceLocation& location,
                                const std::string& context) {
-    addError(CompilationError(type, message, location, context));
+    add_error(CompilationError(type, message, location, context));
 }
 
-std::string ErrorCollection::getFormattedMessage() const {
-    if (errors.empty()) {
+std::string ErrorCollection::get_formatted_message() const {
+    if (_errors.empty()) {
         return "";
     }
     
     std::ostringstream oss;
     
-    for (size_t i = 0; i < errors.size(); ++i) {
-        const auto& error = errors[i];
+    for (size_t i = 0; i < _errors.size(); ++i) {
+        const auto& error = _errors[i];
         
         // Error type prefix
         const char* typeStr = "";
@@ -56,7 +56,7 @@ std::string ErrorCollection::getFormattedMessage() const {
             oss << "\n  Context: " << error.context;
         }
         
-        if (i < errors.size() - 1) {
+        if (i < _errors.size() - 1) {
             oss << "\n";
         }
     }
@@ -64,17 +64,17 @@ std::string ErrorCollection::getFormattedMessage() const {
     return oss.str();
 }
 
-std::string ErrorCollection::getFirstErrorMessage() const {
-    if (errors.empty()) {
+std::string ErrorCollection::get_first_error_message() const {
+    if (_errors.empty()) {
         return "";
     }
     
-    return errors[0].message;
+    return _errors[0].message;
 }
 
-std::vector<CompilationError> ErrorCollection::getErrorsByType(ErrorType type) const {
+std::vector<CompilationError> ErrorCollection::get_errors_by_type(ErrorType type) const {
     std::vector<CompilationError> result;
-    for (const auto& error : errors) {
+    for (const auto& error : _errors) {
         if (error.type == type) {
             result.push_back(error);
         }

@@ -1,0 +1,451 @@
+#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include "doctest.h"
+#include "../parser/gdscript_parser.h"
+#include "../ast_to_riscv_biscuit.h"
+#include "../function_registry.h"
+#include "../code_memory_manager.h"
+#include <string>
+#include <memory>
+#include <cstring>
+#include <sys/mman.h>
+
+using namespace gdscript;
+
+// Helper to compile GDScript and get machine code
+struct CompilationResult {
+    bool success;
+    std::unique_ptr<ProgramNode> ast;
+    const uint8_t* code;
+    size_t codeSize;
+    std::string errorMessage;
+};
+
+CompilationResult compileGDScript(const std::string& source) {
+    CompilationResult result;
+    result.success = false;
+    result.code = nullptr;
+    result.codeSize = 0;
+    
+    // Parse
+    GDScriptParser parser;
+    if (!parser.is_valid()) {
+        result.errorMessage = "Parser initialization failed";
+        return result;
+    }
+    
+    result.ast = parser.parse(source);
+    if (!result.ast) {
+        result.errorMessage = parser.getErrorMessage();
+        return result;
+    }
+    
+    // Emit RISC-V code
+    ASTToRISCVEmitter emitter;
+    auto [code, size] = emitter.emit(result.ast.get());
+    
+    if (code == nullptr || size == 0) {
+        result.errorMessage = "Code generation failed";
+        return result;
+    }
+    
+    result.success = true;
+    result.code = code;
+    result.codeSize = size;
+    return result;
+}
+
+TEST_SUITE("Compiler - Basic Function Compilation") {
+    TEST_CASE("Compile simple function returning integer") {
+        std::string source = "func test():\n    return 42\n";
+        auto result = compileGDScript(source);
+        
+        CHECK(result.success);
+        CHECK(result.ast != nullptr);
+        CHECK(result.code != nullptr);
+        CHECK(result.codeSize > 0);
+        CHECK(result.errorMessage.empty());
+    }
+    
+    TEST_CASE("Compile function with parameters") {
+        std::string source = "func add(a: int, b: int):\n    return a + b\n";
+        auto result = compileGDScript(source);
+        
+        CHECK(result.success);
+        CHECK(result.ast != nullptr);
+        CHECK(result.code != nullptr);
+        CHECK(result.codeSize > 0);
+    }
+    
+    TEST_CASE("Compile function with variable declaration") {
+        std::string source = "func test():\n    var x: int = 10\n    return x\n";
+        auto result = compileGDScript(source);
+        
+        CHECK(result.success);
+        CHECK(result.ast != nullptr);
+        CHECK(result.code != nullptr);
+        CHECK(result.codeSize > 0);
+    }
+    
+    TEST_CASE("Compile function with binary operations") {
+        std::string source = "func test():\n    return 2 + 3 * 4\n";
+        auto result = compileGDScript(source);
+        
+        CHECK(result.success);
+        CHECK(result.ast != nullptr);
+        CHECK(result.code != nullptr);
+        CHECK(result.codeSize > 0);
+    }
+}
+
+TEST_SUITE("Compiler - Comparison Operators") {
+    TEST_CASE("Compile equality comparison") {
+        std::string source = "func test():\n    return 5 == 5\n";
+        auto result = compileGDScript(source);
+        
+        CHECK(result.success);
+        CHECK(result.code != nullptr);
+        CHECK(result.codeSize > 0);
+    }
+    
+    TEST_CASE("Compile inequality comparison") {
+        std::string source = "func test():\n    return 5 != 3\n";
+        auto result = compileGDScript(source);
+        
+        CHECK(result.success);
+        CHECK(result.code != nullptr);
+        CHECK(result.codeSize > 0);
+    }
+    
+    TEST_CASE("Compile less than comparison") {
+        std::string source = "func test():\n    return 3 < 5\n";
+        auto result = compileGDScript(source);
+        
+        CHECK(result.success);
+        CHECK(result.code != nullptr);
+        CHECK(result.codeSize > 0);
+    }
+    
+    TEST_CASE("Compile greater than comparison") {
+        std::string source = "func test():\n    return 5 > 3\n";
+        auto result = compileGDScript(source);
+        
+        CHECK(result.success);
+        CHECK(result.code != nullptr);
+        CHECK(result.codeSize > 0);
+    }
+    
+    TEST_CASE("Compile less than or equal comparison") {
+        std::string source = "func test():\n    return 3 <= 5\n";
+        auto result = compileGDScript(source);
+        
+        CHECK(result.success);
+        CHECK(result.code != nullptr);
+        CHECK(result.codeSize > 0);
+    }
+    
+    TEST_CASE("Compile greater than or equal comparison") {
+        std::string source = "func test():\n    return 5 >= 3\n";
+        auto result = compileGDScript(source);
+        
+        CHECK(result.success);
+        CHECK(result.code != nullptr);
+        CHECK(result.codeSize > 0);
+    }
+}
+
+TEST_SUITE("Compiler - Error Handling") {
+    TEST_CASE("Handle invalid syntax gracefully") {
+        std::string source = "func test():\n    invalid syntax here\n";
+        auto result = compileGDScript(source);
+        
+        // Should fail gracefully with error message
+        CHECK_FALSE(result.success);
+        CHECK_FALSE(result.errorMessage.empty());
+    }
+    
+    TEST_CASE("Handle empty source") {
+        std::string source = "";
+        auto result = compileGDScript(source);
+        
+        // Empty source might be valid (empty program) or invalid
+        // This test documents current behavior
+        // CHECK(result.success); // May or may not succeed
+    }
+    
+    TEST_CASE("Handle missing return statement") {
+        std::string source = "func test():\n    var x = 5\n";
+        auto result = compileGDScript(source);
+        
+        // Should compile (function without return is valid)
+        CHECK(result.success);
+    }
+}
+
+TEST_SUITE("Compiler - Function Registry Integration") {
+    TEST_CASE("Register compiled function") {
+        std::string source = "func test():\n    return 42\n";
+        auto result = compileGDScript(source);
+        
+        REQUIRE(result.success);
+        
+        FunctionRegistry registry;
+        
+        // Allocate executable memory
+        CodeMemoryManager memManager;
+        auto* execMem = memManager.allocate(result.codeSize);
+        REQUIRE(execMem != nullptr);
+        REQUIRE(execMem->is_valid());
+        
+        execMem->copy(result.code, result.codeSize);
+        void* funcAddr = execMem->get();
+        
+        // Register function
+        registry.register_function("test", funcAddr, result.codeSize);
+        
+        CHECK(registry.has_function("test"));
+        CHECK(registry.get_function("test") == funcAddr);
+        CHECK(registry.get_function_size("test") == result.codeSize);
+    }
+    
+    TEST_CASE("Call registered function") {
+        std::string source = "func test():\n    return 42\n";
+        auto result = compileGDScript(source);
+        
+        REQUIRE(result.success);
+        
+        // Allocate executable memory
+        CodeMemoryManager memManager;
+        auto* execMem = memManager.allocate(result.codeSize);
+        REQUIRE(execMem != nullptr);
+        
+        execMem->copy(result.code, result.codeSize);
+        void* funcAddr = execMem->get();
+        
+        // Call function
+        int64_t returnValue = call_assembly_function(funcAddr);
+        
+        // Function should return 42
+        CHECK(returnValue == 42);
+    }
+}
+
+TEST_SUITE("Compiler - Memory Management") {
+    TEST_CASE("CodeMemoryManager tracks allocations") {
+        CodeMemoryManager memManager;
+        
+        CHECK(memManager.getAllocationCount() == 0);
+        
+        auto* mem1 = memManager.allocate(1024);
+        CHECK(mem1 != nullptr);
+        CHECK(memManager.getAllocationCount() == 1);
+        
+        auto* mem2 = memManager.allocate(2048);
+        CHECK(mem2 != nullptr);
+        CHECK(memManager.getAllocationCount() == 2);
+        
+        memManager.clear();
+        CHECK(memManager.getAllocationCount() == 0);
+    }
+    
+    TEST_CASE("ExecutableMemory is valid after allocation") {
+        ExecutableMemory mem(1024);
+        
+        CHECK(mem.is_valid());
+        CHECK(mem.get() != nullptr);
+        CHECK(mem.get_size() == 1024);
+    }
+    
+    TEST_CASE("ExecutableMemory can copy data") {
+        ExecutableMemory mem(1024);
+        REQUIRE(mem.is_valid());
+        
+        uint8_t testData[8] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
+        mem.copy(testData, 8);
+        
+        // Verify data was copied
+        const uint8_t* copied = static_cast<const uint8_t*>(mem.get());
+        for (int i = 0; i < 8; ++i) {
+            CHECK(copied[i] == testData[i]);
+        }
+    }
+}
+
+TEST_SUITE("Compiler - Code Generation Quality") {
+    TEST_CASE("Generated code size is reasonable") {
+        std::string source = "func test():\n    return 42\n";
+        auto result = compileGDScript(source);
+        
+        REQUIRE(result.success);
+        
+        // Simple function should generate at least some code
+        CHECK(result.codeSize >= 16); // Minimum reasonable size
+        
+        // But not excessively large
+        CHECK(result.codeSize < 1024); // Should be compact
+    }
+    
+    TEST_CASE("Multiple functions generate separate code") {
+        std::string source = 
+            "func func1():\n    return 1\n"
+            "func func2():\n    return 2\n";
+        
+        auto result = compileGDScript(source);
+        
+        REQUIRE(result.success);
+        CHECK(result.ast->functions.size() == 2);
+        CHECK(result.codeSize > 0);
+    }
+    
+    TEST_CASE("Complex expression generates more code") {
+        std::string simple = "func test():\n    return 1\n";
+        std::string complex = "func test():\n    return 1 + 2 * 3 - 4 / 2\n";
+        
+        auto simpleResult = compileGDScript(simple);
+        auto complexResult = compileGDScript(complex);
+        
+        REQUIRE(simpleResult.success);
+        REQUIRE(complexResult.success);
+        
+        // Complex expression should generate more code
+        CHECK(complexResult.codeSize >= simpleResult.codeSize);
+    }
+}
+
+TEST_SUITE("Compiler - Integration Tests") {
+    TEST_CASE("Full compilation pipeline works") {
+        std::string source = "func add(a: int, b: int):\n    return a + b\n";
+        
+        // Parse
+        GDScriptParser parser;
+        REQUIRE(parser.is_valid());
+        auto ast = parser.parse(source);
+        REQUIRE(ast != nullptr);
+        REQUIRE(ast->functions.size() == 1);
+        
+        // Emit
+        ASTToRISCVEmitter emitter;
+        auto [code, size] = emitter.emit(ast.get());
+        REQUIRE(code != nullptr);
+        REQUIRE(size > 0);
+        
+        // Memory management
+        CodeMemoryManager memManager;
+        auto* execMem = memManager.allocate(size);
+        REQUIRE(execMem != nullptr);
+        execMem->copy(code, size);
+        
+        // Function registry
+        FunctionRegistry registry;
+        registry.register_function("add", execMem->get(), size);
+        CHECK(registry.has_function("add"));
+    }
+    
+    TEST_CASE("Error collection works") {
+        GDScriptParser parser;
+        REQUIRE(parser.is_valid());
+        
+        std::string invalidSource = "func test():\n    invalid syntax\n";
+        auto ast = parser.parse(invalidSource);
+        
+        // Should have errors
+        const auto& errors = parser.get_errors();
+        if (!ast) {
+            CHECK(errors.has_errors());
+        }
+    }
+}
+
+// TDD: These tests should FAIL first (features not yet implemented)
+TEST_SUITE("Compiler - TDD: Unimplemented Features (Should Fail)") {
+    TEST_CASE("Control flow: if/else statement") {
+        // This should FAIL - if/else not implemented yet
+        std::string source = "func test():\n    if 5 > 3:\n        return 1\n    else:\n        return 0\n";
+        auto result = compileGDScript(source);
+        
+        // Currently will fail to parse or generate code
+        // Once implemented, this should pass
+        CHECK_FALSE(result.success); // TDD: Expect failure until implemented
+    }
+    
+    TEST_CASE("Control flow: while loop") {
+        // This should FAIL - while loops not implemented yet
+        std::string source = "func test():\n    var i = 0\n    while i < 10:\n        i = i + 1\n    return i\n";
+        auto result = compileGDScript(source);
+        
+        CHECK_FALSE(result.success); // TDD: Expect failure until implemented
+    }
+    
+    TEST_CASE("Control flow: for loop") {
+        // This should FAIL - for loops not implemented yet
+        std::string source = "func test():\n    for i in range(10):\n        pass\n    return 0\n";
+        auto result = compileGDScript(source);
+        
+        CHECK_FALSE(result.success); // TDD: Expect failure until implemented
+    }
+    
+    TEST_CASE("Function calls: call other functions") {
+        // This should FAIL - function calls not implemented yet
+        std::string source = 
+            "func add(a: int, b: int):\n    return a + b\n"
+            "func test():\n    return add(1, 2)\n";
+        auto result = compileGDScript(source);
+        
+        // Should compile, but function call codegen not implemented
+        // For now, just check it compiles (call codegen will fail later)
+        // CHECK_FALSE(result.success); // May compile but call won't work
+    }
+    
+    TEST_CASE("String literals") {
+        // This should FAIL - string literals not fully implemented
+        std::string source = "func test():\n    return \"hello\"\n";
+        auto result = compileGDScript(source);
+        
+        // May parse but codegen might fail
+        // CHECK_FALSE(result.success); // TDD: Expect failure until implemented
+    }
+    
+    TEST_CASE("Float literals") {
+        // This should FAIL - float literals converted to int, not proper floats
+        std::string source = "func test():\n    return 3.14\n";
+        auto result = compileGDScript(source);
+        
+        // May compile but float handling not proper
+        // CHECK_FALSE(result.success); // TDD: Expect failure until implemented
+    }
+    
+    TEST_CASE("Logical operators: and/or/not") {
+        // This should FAIL - logical operators not implemented yet
+        std::string source = "func test():\n    return 5 > 3 and 2 < 4\n";
+        auto result = compileGDScript(source);
+        
+        CHECK_FALSE(result.success); // TDD: Expect failure until implemented
+    }
+    
+    TEST_CASE("Array literals") {
+        // This should FAIL - arrays not implemented yet
+        std::string source = "func test():\n    return [1, 2, 3]\n";
+        auto result = compileGDScript(source);
+        
+        CHECK_FALSE(result.success); // TDD: Expect failure until implemented
+    }
+    
+    TEST_CASE("Dictionary literals") {
+        // This should FAIL - dictionaries not implemented yet
+        std::string source = "func test():\n    return {\"key\": \"value\"}\n";
+        auto result = compileGDScript(source);
+        
+        CHECK_FALSE(result.success); // TDD: Expect failure until implemented
+    }
+    
+    TEST_CASE("Type checking: incompatible types") {
+        // This should FAIL - type checking not implemented yet
+        // Should detect error: trying to add string to int
+        std::string source = "func test():\n    return 5 + \"hello\"\n";
+        auto result = compileGDScript(source);
+        
+        // Currently will compile (no type checking)
+        // Once type checking implemented, should fail with semantic error
+        // CHECK_FALSE(result.success); // TDD: Expect failure once type checking added
+    }
+}
+

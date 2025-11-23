@@ -10,7 +10,7 @@ using namespace gdscript;
 TEST_SUITE("Parser Initialization") {
     TEST_CASE("Parser can be created") {
         GDScriptParser parser;
-        CHECK(parser.isValid());
+        CHECK(parser.is_valid());
     }
     
     TEST_CASE("Parser handles empty input") {
