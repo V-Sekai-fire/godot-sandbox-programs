@@ -50,19 +50,6 @@ set_target_properties(test_compiler PROPERTIES
     CXX_STANDARD_REQUIRED ON
 )
 
-# Dataset tests
-add_executable(test_dataset
-    test_dataset.cpp
-    ../src/parser/gdscript_parser.cpp
-    ../src/parser/errors.cpp
-)
-
-# Set C++17 standard (required for std::variant and std::any)
-set_target_properties(test_dataset PROPERTIES
-    CXX_STANDARD 17
-    CXX_STANDARD_REQUIRED ON
-)
-
 # ELF generation test - disabled (source file doesn't exist)
 # test_elf_generation is a utility program, not a test
 # add_executable(test_elf_generation

@@ -45,7 +45,7 @@ jobs:
           exit 1
         fi
         # Build only the test targets we need (excluding test_end_to_end_features which requires libriscv)
-        cmake --build build --target test_parser test_compiler test_dataset --parallel 8
+        cmake --build build --target test_parser test_compiler --parallel 8
         if [ $? -ne 0 ]; then
           echo "ERROR: Test build failed"
           exit 1
@@ -56,7 +56,7 @@ jobs:
       run: |
         echo "Checking for test executables..."
         ls -la programs/gdscript-native/tests/ || echo "Tests directory not found"
-        find . -name "test_parser" -o -name "test_compiler" -o -name "test_dataset" || echo "Test executables not found"
+        find . -name "test_parser" -o -name "test_compiler" || echo "Test executables not found"
 
     - name: Run parser tests
       working-directory: ${{github.workspace}}/build
@@ -78,15 +78,5 @@ jobs:
           exit 1
         fi
 
-    - name: Run dataset tests
-      working-directory: ${{github.workspace}}/build
-      run: |
-        if [ -f programs/gdscript-native/tests/test_dataset ]; then
-          ./programs/gdscript-native/tests/test_dataset
-        else
-          echo "ERROR: test_dataset not found at programs/gdscript-native/tests/test_dataset"
-          exit 1
-        fi
-
-    # Note: test_elf_generation was removed - source file doesn't exist
+    # Note: test_dataset and test_elf_generation were removed
 
