@@ -111,14 +111,14 @@ static Variant test_compile() {
 // TODO: Re-enable when test_data_loader is added
 static Variant test_dataset(int count) {
 	print("Error: test_data_loader not available\n");
-	return Nil;
+		return Nil;
 }
 
 // Get a random entry from the dataset
 // TODO: Re-enable when test_data_loader is added
 static Variant get_random_test() {
 	print("Error: test_data_loader not available\n");
-	return Nil;
+		return Nil;
 }
 
 int main() {

@@ -156,6 +156,18 @@ if(APPLE)
     endif()
 endif()
 
+# Dataset parsing test
+add_executable(test_dataset_parse
+    test_dataset_parse.cpp
+    ${PARSER_SOURCES}
+)
+
+# Set C++17 standard for dataset test
+set_target_properties(test_dataset_parse PROPERTIES
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED ON
+)
+
 # Test runner - runs all tests in a single executable
 add_executable(test_runner
     test_runner.cpp

@@ -54,7 +54,7 @@ private:
     // Helper to build AST nodes
     std::unique_ptr<LiteralExpr> make_literal(const Token& token);
     std::unique_ptr<IdentifierExpr> make_identifier(const Token& token);
-    
+
 public:
     GDScriptParser();
     

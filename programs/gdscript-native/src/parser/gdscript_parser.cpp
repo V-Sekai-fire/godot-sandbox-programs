@@ -49,7 +49,7 @@ void GDScriptParser::synchronize() {
             case TokenType::IF:
             case TokenType::FOR:
             case TokenType::WHILE:
-                return;
+        return;
             default:
                 break;
         }
@@ -72,7 +72,7 @@ void GDScriptParser::error_at_current(const std::string& message) {
 }
 
 std::unique_ptr<ProgramNode> GDScriptParser::parse_program() {
-    auto program = std::make_unique<ProgramNode>();
+    std::unique_ptr<ProgramNode> program = std::make_unique<ProgramNode>();
     
     while (!is_at_end()) {
         // Skip newlines and indentation at top level
@@ -83,7 +83,7 @@ std::unique_ptr<ProgramNode> GDScriptParser::parse_program() {
         if (is_at_end()) break;
         
         if (check(TokenType::FUNC)) {
-            auto func = parse_function();
+            std::unique_ptr<FunctionNode> func = parse_function();
             if (func) {
                 program->functions.push_back(std::move(func));
             }
@@ -99,7 +99,7 @@ std::unique_ptr<ProgramNode> GDScriptParser::parse_program() {
 std::unique_ptr<FunctionNode> GDScriptParser::parse_function() {
     consume(TokenType::FUNC, "Expected 'func'");
     
-    auto func = std::make_unique<FunctionNode>();
+    std::unique_ptr<FunctionNode> func = std::make_unique<FunctionNode>();
     
     // Function name
     if (check(TokenType::IDENTIFIER)) {
@@ -108,7 +108,7 @@ std::unique_ptr<FunctionNode> GDScriptParser::parse_function() {
     } else {
         error_at_current("Expected function name");
         return nullptr;
-    }
+            }
     
     // Parameters
     consume(TokenType::PARENTHESIS_OPEN, "Expected '(' after function name");
@@ -129,7 +129,7 @@ std::unique_ptr<FunctionNode> GDScriptParser::parse_function() {
                 func->parameters.push_back({param_name, param_type});
             }
         } while (match(TokenType::COMMA));
-    }
+            }
     
     consume(TokenType::PARENTHESIS_CLOSE, "Expected ')' after parameters");
     
@@ -148,14 +148,14 @@ std::unique_ptr<FunctionNode> GDScriptParser::parse_function() {
     parse_suite("function", func->body);
     
     return func;
-}
+            }
 
 void GDScriptParser::parse_suite(const std::string& context, std::vector<std::unique_ptr<StatementNode>>& statements) {
     // Check for multiline (newline followed by indent)
     bool multiline = false;
     if (match(TokenType::NEWLINE)) {
         multiline = true;
-    }
+            }
     
     if (multiline) {
         if (!check(TokenType::INDENT)) {
@@ -175,12 +175,12 @@ void GDScriptParser::parse_suite(const std::string& context, std::vector<std::un
         // Check for dedent (end of block)
         if (multiline && check(TokenType::DEDENT)) {
             advance();
-            break;
-        }
+                break;
+            }
         
         if (is_at_end()) break;
         
-        auto stmt = parse_statement();
+        std::unique_ptr<StatementNode> stmt = parse_statement();
         if (stmt) {
             statements.push_back(std::move(stmt));
         } else {
@@ -208,22 +208,22 @@ std::unique_ptr<StatementNode> GDScriptParser::parse_statement() {
 std::unique_ptr<ReturnStatement> GDScriptParser::parse_return_statement() {
     consume(TokenType::RETURN, "Expected 'return'");
     
-    auto stmt = std::make_unique<ReturnStatement>();
+    std::unique_ptr<ReturnStatement> stmt = std::make_unique<ReturnStatement>();
     
     if (!check(TokenType::NEWLINE) && !check(TokenType::DEDENT) && !is_at_end()) {
         stmt->value = parse_expression();
-    }
+        }
     
     // Consume newline if present
     match(TokenType::NEWLINE);
     
     return stmt;
-}
+        }
 
 std::unique_ptr<VariableDeclaration> GDScriptParser::parse_variable_declaration() {
     consume(TokenType::VAR, "Expected 'var'");
     
-    auto decl = std::make_unique<VariableDeclaration>();
+    std::unique_ptr<VariableDeclaration> decl = std::make_unique<VariableDeclaration>();
     
     if (check(TokenType::IDENTIFIER)) {
         decl->name = current.literal;
@@ -231,8 +231,8 @@ std::unique_ptr<VariableDeclaration> GDScriptParser::parse_variable_declaration(
     } else {
         error_at_current("Expected variable name");
         return nullptr;
-    }
-    
+        }
+        
     // Type hint
     if (match(TokenType::COLON)) {
         if (check(TokenType::IDENTIFIER)) {
@@ -244,8 +244,8 @@ std::unique_ptr<VariableDeclaration> GDScriptParser::parse_variable_declaration(
     // Initializer
     if (match(TokenType::EQUAL)) {
         decl->initializer = parse_expression();
-    }
-    
+            }
+            
     // Consume newline
     match(TokenType::NEWLINE);
     
@@ -257,12 +257,12 @@ std::unique_ptr<ExpressionNode> GDScriptParser::parse_expression() {
 }
 
 std::unique_ptr<ExpressionNode> GDScriptParser::parse_equality() {
-    auto expr = parse_comparison();
+    std::unique_ptr<ExpressionNode> expr = parse_comparison();
     
     while (match(TokenType::EQUAL_EQUAL) || match(TokenType::BANG_EQUAL)) {
         Token op = previous;
-        auto right = parse_comparison();
-        auto binop = std::make_unique<BinaryOpExpr>();
+        std::unique_ptr<ExpressionNode> right = parse_comparison();
+        std::unique_ptr<BinaryOpExpr> binop = std::make_unique<BinaryOpExpr>();
         binop->left = std::move(expr);
         binop->right = std::move(right);
         binop->op = (op.type == TokenType::EQUAL_EQUAL) ? "==" : "!=";
@@ -273,13 +273,13 @@ std::unique_ptr<ExpressionNode> GDScriptParser::parse_equality() {
 }
 
 std::unique_ptr<ExpressionNode> GDScriptParser::parse_comparison() {
-    auto expr = parse_term();
+    std::unique_ptr<ExpressionNode> expr = parse_term();
     
     while (match(TokenType::GREATER) || match(TokenType::GREATER_EQUAL) ||
            match(TokenType::LESS) || match(TokenType::LESS_EQUAL)) {
         Token op = previous;
-        auto right = parse_term();
-        auto binop = std::make_unique<BinaryOpExpr>();
+        std::unique_ptr<ExpressionNode> right = parse_term();
+        std::unique_ptr<BinaryOpExpr> binop = std::make_unique<BinaryOpExpr>();
         binop->left = std::move(expr);
         binop->right = std::move(right);
         if (op.type == TokenType::GREATER) binop->op = ">";
@@ -293,12 +293,12 @@ std::unique_ptr<ExpressionNode> GDScriptParser::parse_comparison() {
 }
 
 std::unique_ptr<ExpressionNode> GDScriptParser::parse_term() {
-    auto expr = parse_factor();
+    std::unique_ptr<ExpressionNode> expr = parse_factor();
     
     while (match(TokenType::PLUS) || match(TokenType::MINUS)) {
         Token op = previous;
-        auto right = parse_factor();
-        auto binop = std::make_unique<BinaryOpExpr>();
+        std::unique_ptr<ExpressionNode> right = parse_factor();
+        std::unique_ptr<BinaryOpExpr> binop = std::make_unique<BinaryOpExpr>();
         binop->left = std::move(expr);
         binop->right = std::move(right);
         binop->op = (op.type == TokenType::PLUS) ? "+" : "-";
@@ -309,12 +309,12 @@ std::unique_ptr<ExpressionNode> GDScriptParser::parse_term() {
 }
 
 std::unique_ptr<ExpressionNode> GDScriptParser::parse_factor() {
-    auto expr = parse_unary();
+    std::unique_ptr<ExpressionNode> expr = parse_unary();
     
     while (match(TokenType::STAR) || match(TokenType::SLASH) || match(TokenType::PERCENT)) {
         Token op = previous;
-        auto right = parse_unary();
-        auto binop = std::make_unique<BinaryOpExpr>();
+        std::unique_ptr<ExpressionNode> right = parse_unary();
+        std::unique_ptr<BinaryOpExpr> binop = std::make_unique<BinaryOpExpr>();
         binop->left = std::move(expr);
         binop->right = std::move(right);
         if (op.type == TokenType::STAR) binop->op = "*";
@@ -325,12 +325,12 @@ std::unique_ptr<ExpressionNode> GDScriptParser::parse_factor() {
     
     return expr;
 }
-
+        
 std::unique_ptr<ExpressionNode> GDScriptParser::parse_unary() {
     if (match(TokenType::MINUS) || match(TokenType::NOT)) {
         Token op = previous;
-        auto right = parse_unary();
-        auto unary = std::make_unique<UnaryOpExpr>();
+        std::unique_ptr<ExpressionNode> right = parse_unary();
+        std::unique_ptr<UnaryOpExpr> unary = std::make_unique<UnaryOpExpr>();
         unary->operand = std::move(right);
         unary->op = (op.type == TokenType::MINUS) ? "-" : "!";
         return unary;
@@ -346,10 +346,10 @@ std::unique_ptr<ExpressionNode> GDScriptParser::parse_primary() {
     
     if (match(TokenType::IDENTIFIER)) {
         return make_identifier(previous);
-    }
+                }
     
     if (match(TokenType::PARENTHESIS_OPEN)) {
-        auto expr = parse_expression();
+        std::unique_ptr<ExpressionNode> expr = parse_expression();
         consume(TokenType::PARENTHESIS_CLOSE, "Expected ')' after expression");
         return expr;
     }
@@ -359,8 +359,8 @@ std::unique_ptr<ExpressionNode> GDScriptParser::parse_primary() {
 }
 
 std::unique_ptr<LiteralExpr> GDScriptParser::make_literal(const Token& token) {
-    auto lit = std::make_unique<LiteralExpr>();
-    
+    std::unique_ptr<LiteralExpr> lit = std::make_unique<LiteralExpr>();
+        
     // Parse literal value
     if (token.literal == "true") {
         lit->value = true;
@@ -369,14 +369,42 @@ std::unique_ptr<LiteralExpr> GDScriptParser::make_literal(const Token& token) {
     } else if (token.literal == "null") {
         lit->value = nullptr;
     } else {
-        // Try to parse as number
-        try {
-            if (token.literal.find('.') != std::string::npos) {
-                lit->value = std::stod(token.literal);
-            } else {
-                lit->value = static_cast<int64_t>(std::stoll(token.literal));
+        // Try to parse as number (without exceptions)
+        bool is_float = token.literal.find('.') != std::string::npos;
+        bool is_number = true;
+        
+        // Check if it's a valid number
+        for (size_t i = 0; i < token.literal.length(); ++i) {
+            char c = token.literal[i];
+            if (i == 0 && c == '-') continue; // Allow negative sign
+            if (c == '.' && is_float) continue; // Allow decimal point
+            if (c < '0' || c > '9') {
+                is_number = false;
+                break;
             }
-        } catch (...) {
+        }
+        
+        if (is_number) {
+            if (is_float) {
+                char* end = nullptr;
+                double val = std::strtod(token.literal.c_str(), &end);
+                if (end != token.literal.c_str() && *end == '\0') {
+                    lit->value = val;
+                } else {
+                    // String literal (parsing failed)
+                    lit->value = token.literal;
+                }
+            } else {
+                char* end = nullptr;
+                int64_t val = std::strtoll(token.literal.c_str(), &end, 10);
+                if (end != token.literal.c_str() && *end == '\0') {
+                    lit->value = val;
+                } else {
+                    // String literal (parsing failed)
+                    lit->value = token.literal;
+                }
+            }
+        } else {
             // String literal (already has quotes stripped)
             lit->value = token.literal;
         }
@@ -386,7 +414,7 @@ std::unique_ptr<LiteralExpr> GDScriptParser::make_literal(const Token& token) {
 }
 
 std::unique_ptr<IdentifierExpr> GDScriptParser::make_identifier(const Token& token) {
-    auto ident = std::make_unique<IdentifierExpr>();
+    std::unique_ptr<IdentifierExpr> ident = std::make_unique<IdentifierExpr>();
     ident->name = token.literal;
     return ident;
 }
@@ -399,11 +427,7 @@ std::unique_ptr<ProgramNode> GDScriptParser::parse(const std::string& source) {
     current = tokenizer.scan();
     previous = current;
     
-    try {
-        return parse_program();
-    } catch (...) {
-        return nullptr;
-    }
+    return parse_program();
 }
 
 std::string GDScriptParser::getErrorMessage() const {
