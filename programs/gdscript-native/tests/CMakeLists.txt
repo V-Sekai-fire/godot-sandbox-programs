@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
+project(gdscript-native-tests)
 
 # Add doctest include directory
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
@@ -52,7 +53,14 @@ set_target_properties(test_compiler PROPERTIES
 add_executable(test_dataset
     test_dataset.cpp
     ../parser/gdscript_parser.cpp
+    ../parser/errors.cpp
     ../test_data_loader.cpp
+)
+
+# Set C++17 standard (required for std::variant and std::any)
+set_target_properties(test_dataset PROPERTIES
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED ON
 )
 
 # ELF generation test

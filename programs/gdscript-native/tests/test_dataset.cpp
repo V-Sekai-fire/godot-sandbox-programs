@@ -21,7 +21,7 @@ TEST_SUITE("Dataset Testing") {
         std::string datasetPath = "test_data/data/godot_dodo_4x_60k/godot_dodo_4x_60k_data.json";
         
         if (!loader.loadDataset(datasetPath)) {
-            SKIP("Dataset not available");
+            // Dataset not available, skip this test
             return;
         }
         
@@ -56,7 +56,7 @@ TEST_SUITE("Dataset Testing") {
         std::string datasetPath = "test_data/data/godot_dodo_4x_60k/godot_dodo_4x_60k_data.json";
         
         if (!loader.loadDataset(datasetPath)) {
-            SKIP("Dataset not available");
+            // Dataset not available, skip this test
             return;
         }
         
