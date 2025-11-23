@@ -13,4 +13,6 @@
 #include "test_compiler_features.cpp"
 #include "test_compiler_execution.cpp"
 #include "test_end_to_end_features.cpp"
+#include "test_ast_interpreter.cpp"
+#include "test_adhoc.cpp"
 

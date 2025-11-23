@@ -193,8 +193,34 @@ add_executable(test_dataset_parse
     ${PARSER_SOURCES}
 )
 
+# AST Interpreter test
+add_executable(test_ast_interpreter
+    test_ast_interpreter.cpp
+    ${PARSER_SOURCES}
+    ../src/ast_interpreter.cpp
+)
+
+# Adhoc tests (converted from manual testing)
+add_executable(test_adhoc
+    test_adhoc.cpp
+    ${PARSER_SOURCES}
+    ../src/ast_interpreter.cpp
+)
+
 # Set C++17 standard for dataset test
 set_target_properties(test_dataset_parse PROPERTIES
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED ON
+)
+
+# Set C++17 standard for AST interpreter test
+set_target_properties(test_ast_interpreter PROPERTIES
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED ON
+)
+
+# Set C++17 standard for adhoc test
+set_target_properties(test_adhoc PROPERTIES
     CXX_STANDARD 17
     CXX_STANDARD_REQUIRED ON
 )
@@ -204,6 +230,8 @@ add_executable(test_runner
     test_runner.cpp
     ${COMPILER_SOURCES}
     ../src/elf_generator.cpp
+    ../src/ast_interpreter.cpp
+    ../src/riscv_code_templates.cpp
 )
 
 # Set C++20 standard for test runner

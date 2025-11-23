@@ -29,7 +29,8 @@ ASTInterpreter::ExecutionResult ASTInterpreter::execute_function(
     const std::string& function_name,
     const std::vector<Value>& args
 ) {
-    clear();
+    // Don't clear here - preserve call stack for nested calls
+    // Only clear in execute() (entry point)
     
     const FunctionNode* func = _find_function(program, function_name);
     if (!func) {
@@ -212,41 +213,14 @@ ASTInterpreter::Value ASTInterpreter::_evaluate_call(const CallExpr* call, Frame
         return Value{int64_t(0)};
     }
     
-    // Create new frame for called function
-    Frame call_frame;
-    call_frame.function = target_func;
-    call_frame.program = frame.program;
-    call_frame.pc = 0;
-    
-    // Initialize parameters
-    for (size_t i = 0; i < target_func->parameters.size(); ++i) {
-        call_frame.variables[target_func->parameters[i].first] = args[i];
+    // Use execute_function to handle nested calls properly
+    // This preserves the call stack and handles returns correctly
+    ExecutionResult result = execute_function(frame.program, func_name, args);
+    if (result.success) {
+        return result.return_value;
     }
     
-    // Push frame onto call stack
-    _call_stack.push_back(call_frame);
-    
-    // Execute function body
-    Value return_value{int64_t(0)};
-    bool has_return = false;
-    
-    for (const std::unique_ptr<StatementNode>& stmt : target_func->body) {
-        if (stmt->get_type() == ASTNode::NodeType::ReturnStatement) {
-            const ReturnStatement* ret = static_cast<const ReturnStatement*>(stmt.get());
-            if (ret->value) {
-                return_value = _evaluate_expression(ret->value.get(), call_frame);
-            }
-            has_return = true;
-            break;
-        } else {
-            _execute_statement(stmt.get(), call_frame);
-        }
-    }
-    
-    // Pop frame from call stack
-    _call_stack.pop_back();
-    
-    return return_value;
+    return Value{int64_t(0)};
 }
 
 void ASTInterpreter::_execute_statement(const StatementNode* stmt, Frame& frame) {
@@ -341,12 +315,12 @@ void ASTInterpreter::_execute_if_statement(const IfStatement* if_stmt, Frame& fr
             _execute_statement(stmt.get(), frame);
         }
     } else if (!if_stmt->elif_branches.empty()) {
-        // Handle elif branches
+        // Handle elif branches (elif_branches is vector of pairs: (condition, body))
         for (const auto& elif : if_stmt->elif_branches) {
-            if (!elif.condition) {
+            if (!elif.first) {
                 continue;
             }
-            Value elif_cond = _evaluate_expression(elif.condition.get(), frame);
+            Value elif_cond = _evaluate_expression(elif.first.get(), frame);
             bool elif_condition = false;
             if (std::holds_alternative<int64_t>(elif_cond)) {
                 elif_condition = std::get<int64_t>(elif_cond) != 0;
@@ -354,7 +328,7 @@ void ASTInterpreter::_execute_if_statement(const IfStatement* if_stmt, Frame& fr
                 elif_condition = std::get<bool>(elif_cond);
             }
             if (elif_condition) {
-                for (const std::unique_ptr<StatementNode>& stmt : elif.body) {
+                for (const std::unique_ptr<StatementNode>& stmt : elif.second) {
                     _execute_statement(stmt.get(), frame);
                 }
                 return;
