@@ -36,7 +36,7 @@ jobs:
     - name: Build tests
       working-directory: ${{github.workspace}}
       run: |
-        cmake -B build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+        cmake -B build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DRISCV_BINARY_TRANSLATION=OFF -DRISCV_LIBTCC=OFF
         if [ $? -ne 0 ]; then
           echo "ERROR: CMake configuration failed"
           exit 1
