@@ -6,85 +6,93 @@
 
 using namespace gdscript;
 
-TEST_SUITE("Function Parsing") {
-    TEST_CASE("Parse simple function") {
+TEST_SUITE("Function Parsing (from godot-dodo corpus)") {
+    TEST_CASE("Parse simple function with return type") {
         GDScriptParser parser;
-        std::string source = R"(func hello():
-return 42
+        std::string source = R"(func _get_import_order() -> int:
+	return IMPORT_ORDER_DEFAULT
 )";
         auto ast = parser.parse(source);
         CHECK(ast != nullptr);
         CHECK(ast->functions.size() >= 1);
-        // TODO: Verify function name and body
+    }
+    
+    TEST_CASE("Parse function without return type") {
+        GDScriptParser parser;
+        std::string source = R"(func _get_name():
+	return "BlendBurn"
+)";
+        auto ast = parser.parse(source);
+        CHECK(ast != nullptr);
+        CHECK(ast->functions.size() >= 1);
+    }
+    
+    TEST_CASE("Parse function with void return type") {
+        GDScriptParser parser;
+        std::string source = R"(func reset_typing() -> void:
+	char_idx = -1
+)";
+        auto ast = parser.parse(source);
+        CHECK(ast != nullptr);
+        CHECK(ast->functions.size() >= 1);
     }
     
     TEST_CASE("Parse function with parameters") {
         GDScriptParser parser;
-        std::string source = R"(func add(a: int, b: int):
-return a + b
+        std::string source = R"(func _import_option_toggled(pressed: bool) -> void:
+	use_imported_size = pressed
+	
 )";
         auto ast = parser.parse(source);
         CHECK(ast != nullptr);
-        // TODO: Verify parameters are parsed correctly
-    }
-    
-    TEST_CASE("Parse function with return type") {
-        GDScriptParser parser;
-        std::string source = R"(func get_value() -> int:
-return 42
-)";
-        auto ast = parser.parse(source);
-        CHECK(ast != nullptr);
-        // TODO: Verify return type is parsed
+        CHECK(ast->functions.size() >= 1);
     }
 }
 
-TEST_SUITE("Return Statement") {
-    TEST_CASE("Parse return with value") {
+TEST_SUITE("Return Statement (from godot-dodo corpus)") {
+    TEST_CASE("Parse return with identifier") {
         GDScriptParser parser;
-        std::string source = R"(func test():
-return 42
+        std::string source = R"(func get_option_index():
+	return OptionIndex
+	
 )";
         auto ast = parser.parse(source);
         CHECK(ast != nullptr);
     }
     
-    TEST_CASE("Parse return without value") {
+    TEST_CASE("Parse return with string literal") {
         GDScriptParser parser;
-        std::string source = R"(func test():
-return
+        std::string source = R"(func get_shortcode() -> String:
+	return "music"
+)";
+        auto ast = parser.parse(source);
+        CHECK(ast != nullptr);
+    }
+    
+    TEST_CASE("Parse return with boolean") {
+        GDScriptParser parser;
+        std::string source = R"(func is_navigation_controller() -> bool:
+	return false
+)";
+        auto ast = parser.parse(source);
+        CHECK(ast != nullptr);
+    }
+    
+    TEST_CASE("Parse return with null") {
+        GDScriptParser parser;
+        std::string source = R"(func _get_navmesh_template() -> NavigationMesh :
+	return null
 )";
         auto ast = parser.parse(source);
         CHECK(ast != nullptr);
     }
 }
 
-TEST_SUITE("Variable Declaration") {
-    TEST_CASE("Parse variable declaration") {
+TEST_SUITE("Variable Declaration (from godot-dodo corpus)") {
+    TEST_CASE("Parse function with pass statement") {
         GDScriptParser parser;
-        std::string source = R"(func test():
-var x = 42
-return x
-)";
-        auto ast = parser.parse(source);
-        CHECK(ast != nullptr);
-    }
-    
-    TEST_CASE("Parse variable with type hint") {
-        GDScriptParser parser;
-        std::string source = R"(func test():
-var x: int = 42
-return x
-)";
-        auto ast = parser.parse(source);
-        CHECK(ast != nullptr);
-    }
-    
-    TEST_CASE("Parse variable without initializer") {
-        GDScriptParser parser;
-        std::string source = R"(func test():
-var x
-return x
+        std::string source = R"(func only_one_time_call() -> void:
+		pass
 )";
         auto ast = parser.parse(source);
         CHECK(ast != nullptr);

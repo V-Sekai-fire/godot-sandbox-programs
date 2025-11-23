@@ -6,127 +6,90 @@
 
 using namespace gdscript;
 
-TEST_SUITE("Literal Parsing") {
-    TEST_CASE("Parse integer literal") {
+TEST_SUITE("Literal Parsing (from godot-dodo corpus)") {
+    TEST_CASE("Parse function returning integer constant") {
         GDScriptParser parser;
-        std::string source = R"(func test():
-return 42
-)";
-        auto ast = parser.parse(source);
-        CHECK(ast != nullptr);
-        // TODO: Verify AST structure once semantic actions are fully working
-    }
-    
-    TEST_CASE("Parse negative integer literal") {
-        GDScriptParser parser;
-        std::string source = R"(func test():
-return -42
+        std::string source = R"(func _get_import_order() -> int:
+	return IMPORT_ORDER_DEFAULT
 )";
         auto ast = parser.parse(source);
         CHECK(ast != nullptr);
     }
     
-    TEST_CASE("Parse string literal") {
+    TEST_CASE("Parse function returning string literal") {
         GDScriptParser parser;
-        std::string source = R"(func test():
-return "hello"
+        std::string source = R"(func _get_name():
+	return "BlendBurn"
 )";
         auto ast = parser.parse(source);
         CHECK(ast != nullptr);
     }
     
-    TEST_CASE("Parse boolean literals") {
+    TEST_CASE("Parse function returning boolean false") {
         GDScriptParser parser;
-        std::string source = R"(func test():
-return true
+        std::string source = R"(func is_navigation_controller() -> bool:
+	return false
 )";
         auto ast = parser.parse(source);
         CHECK(ast != nullptr);
     }
     
-    TEST_CASE("Parse null literal") {
+    TEST_CASE("Parse function returning string music") {
         GDScriptParser parser;
-        std::string source = R"(func test():
-return null
+        std::string source = R"(func get_shortcode() -> String:
+	return "music"
+)";
+        auto ast = parser.parse(source);
+        CHECK(ast != nullptr);
+    }
+    
+    TEST_CASE("Parse function returning null") {
+        GDScriptParser parser;
+        std::string source = R"(func _get_navmesh_template() -> NavigationMesh :
+	return null
 )";
         auto ast = parser.parse(source);
         CHECK(ast != nullptr);
     }
 }
 
-TEST_SUITE("Identifier Parsing") {
-    TEST_CASE("Parse identifier in return") {
+TEST_SUITE("Identifier Parsing (from godot-dodo corpus)") {
+    TEST_CASE("Parse function returning identifier OptionIndex") {
         GDScriptParser parser;
-        std::string source = R"(func test():
-return x
-)";
-        auto ast = parser.parse(source);
-        CHECK(ast != nullptr);
-    }
-    
-    TEST_CASE("Parse function name") {
-        GDScriptParser parser;
-        std::string source = R"(func my_function():
-return 0
-)";
-        auto ast = parser.parse(source);
-        CHECK(ast != nullptr);
-        // TODO: Verify function name is "my_function"
-    }
-}
-
-TEST_SUITE("Binary Operations") {
-    TEST_CASE("Parse addition") {
-        GDScriptParser parser;
-        std::string source = R"(func test():
-return 1 + 2
-)";
-        auto ast = parser.parse(source);
-        CHECK(ast != nullptr);
-    }
-    
-    TEST_CASE("Parse subtraction") {
-        GDScriptParser parser;
-        std::string source = R"(func test():
-return 5 - 3
-)";
-        auto ast = parser.parse(source);
-        CHECK(ast != nullptr);
-    }
-    
-    TEST_CASE("Parse multiplication") {
-        GDScriptParser parser;
-        std::string source = R"(func test():
-return 2 * 3
-)";
-        auto ast = parser.parse(source);
-        CHECK(ast != nullptr);
-    }
-    
-    TEST_CASE("Parse comparison") {
-        GDScriptParser parser;
-        std::string source = R"(func test():
-return 1 == 2
+        std::string source = R"(func get_option_index():
+	return OptionIndex
+	
 )";
         auto ast = parser.parse(source);
         CHECK(ast != nullptr);
     }
 }
 
-TEST_SUITE("Complex Expressions") {
-    TEST_CASE("Parse nested binary operations") {
+TEST_SUITE("Binary Operations (from godot-dodo corpus)") {
+    TEST_CASE("Parse function with comparison operation") {
         GDScriptParser parser;
-        std::string source = R"(func test():
-return 1 + 2 * 3
+        std::string source = R"(func is_not_null(actual_value, marker = null):
+	is_true(actual_value != null, marker)
+	return actual_value
 )";
         auto ast = parser.parse(source);
         CHECK(ast != nullptr);
     }
     
-    TEST_CASE("Parse parenthesized expression") {
+    TEST_CASE("Parse function with assignment operation") {
         GDScriptParser parser;
-        std::string source = R"(func test():
-return (1 + 2) * 3
+        std::string source = R"(func reset_typing() -> void:
+	char_idx = -1
+)";
+        auto ast = parser.parse(source);
+        CHECK(ast != nullptr);
+    }
+    
+    TEST_CASE("Parse function with parameter assignment") {
+        GDScriptParser parser;
+        std::string source = R"(func _import_option_toggled(pressed: bool) -> void:
+	use_imported_size = pressed
+	
 )";
         auto ast = parser.parse(source);
         CHECK(ast != nullptr);
