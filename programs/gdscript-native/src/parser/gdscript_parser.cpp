@@ -3,7 +3,7 @@
 
 namespace gdscript {
 
-GDScriptParser::GDScriptParser() {
+GDScriptParser::GDScriptParser() : has_lookahead(false) {
 }
 
 bool GDScriptParser::is_at_end() const {
@@ -26,10 +26,27 @@ bool GDScriptParser::match(TokenType type) {
 Token GDScriptParser::advance() {
     if (!is_at_end()) {
         previous = current;
-        current = tokenizer.scan();
+        if (has_lookahead) {
+            current = lookahead;
+            has_lookahead = false;
+        } else {
+            current = tokenizer.scan();
         }
+    }
     return previous;
+}
+
+// Peek at next token without consuming it
+TokenType GDScriptParser::peek() {
+    if (!has_lookahead) {
+        if (is_at_end()) {
+            return TokenType::EOF_TOKEN;
         }
+        lookahead = tokenizer.scan();
+        has_lookahead = true;
+    }
+    return lookahead.type;
+}
         
 Token GDScriptParser::consume(TokenType type, const std::string& message) {
     if (check(type)) return advance();
@@ -211,23 +228,9 @@ std::unique_ptr<StatementNode> GDScriptParser::parse_statement() {
     }
     
     // Try assignment statement: identifier = expression
-    // Simple approach: if we see identifier followed by =, it's an assignment
-    // We'll check by looking ahead one token
-    if (check(TokenType::IDENTIFIER)) {
-        // Temporarily advance to peek at next token
-        Token saved_prev = previous;
-        Token saved_curr = current;
-        advance(); // Move to next token
-        bool is_assignment = check(TokenType::EQUAL);
-        // Restore (we can't rewind tokenizer, but we can restore our tokens)
-        // Actually, we need a different approach - just try parsing assignment first
-        // and if it fails, fall back to expression
-        previous = saved_prev;
-        current = saved_curr;
-        
-        if (is_assignment) {
-            return parse_assignment_statement();
-        }
+    // Use lookahead to check if next token is EQUAL
+    if (check(TokenType::IDENTIFIER) && peek() == TokenType::EQUAL) {
+        return parse_assignment_statement();
     }
     
     // Expression statement (fallback for function calls, etc.)
@@ -629,13 +632,14 @@ std::unique_ptr<IdentifierExpr> GDScriptParser::make_identifier(const Token& tok
 std::unique_ptr<ProgramNode> GDScriptParser::parse(const std::string& source) {
     last_error_message.clear();
     _errors.clear();
+    has_lookahead = false;
     
     tokenizer.set_source(source);
     current = tokenizer.scan();
     previous = current;
     
     return parse_program();
-                }
+}
 
 std::string GDScriptParser::getErrorMessage() const {
     return last_error_message;

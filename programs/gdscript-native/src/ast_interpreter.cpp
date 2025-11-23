@@ -54,6 +54,7 @@ ASTInterpreter::ExecutionResult ASTInterpreter::execute_function(
     }
     
     _call_stack.push_back(frame);
+    Frame& stack_frame = _call_stack.back(); // Get reference to frame on stack
     
     // Execute function body
     Value return_value{int64_t(0)}; // Default return value
@@ -64,15 +65,16 @@ ASTInterpreter::ExecutionResult ASTInterpreter::execute_function(
             if (stmt->get_type() == ASTNode::NodeType::ReturnStatement) {
                 const ReturnStatement* ret = static_cast<const ReturnStatement*>(stmt.get());
                 if (ret->value) {
-                    return_value = _evaluate_expression(ret->value.get(), frame);
+                    return_value = _evaluate_expression(ret->value.get(), stack_frame);
                 }
                 has_return = true;
                 break; // Return exits function
             } else {
-                _execute_statement(stmt.get(), frame);
+                _execute_statement(stmt.get(), stack_frame);
             }
         }
     } catch (const std::exception& e) {
+        _call_stack.pop_back();
         return {Value{int64_t(0)}, false, std::string("Execution error: ") + e.what()};
     }
     
@@ -298,16 +300,13 @@ void ASTInterpreter::_execute_assignment(const AssignmentStatement* assign, Fram
     const IdentifierExpr* target = static_cast<const IdentifierExpr*>(assign->target.get());
     Value value = _evaluate_expression(assign->value.get(), frame);
     
-    // Update in current frame (always update/create in current frame for now)
-    // In a full implementation, we'd check parent frames for nested scopes
+    // Update in current frame - this is the frame passed by reference, so update directly
     frame.variables[target->name] = value;
     
-    // Also update the frame on the call stack if it exists
-    if (!_call_stack.empty()) {
-        Frame& stack_frame = _call_stack.back();
-        if (&stack_frame == &frame || stack_frame.function == frame.function) {
-            stack_frame.variables[target->name] = value;
-        }
+    // Also update the frame on the call stack if it's the same frame
+    // (frame is a reference to the last element in _call_stack)
+    if (!_call_stack.empty() && _call_stack.back().function == frame.function) {
+        _call_stack.back().variables[target->name] = value;
     }
 }
 

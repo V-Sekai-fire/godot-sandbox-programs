@@ -15,6 +15,8 @@ private:
     GDScriptTokenizer tokenizer;
     Token current;
     Token previous;
+    Token lookahead; // One-token lookahead buffer
+    bool has_lookahead; // Whether lookahead is valid
     
     // Error collection
     ErrorCollection _errors;
@@ -25,6 +27,7 @@ private:
     bool check(TokenType type) const;
     bool match(TokenType type);
     Token advance();
+    TokenType peek(); // Peek at next token without consuming
     Token consume(TokenType type, const std::string& message);
     void synchronize();
     
