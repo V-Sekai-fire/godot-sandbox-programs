@@ -1,0 +1,12 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/ingydotnet/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/lvandeve/lodepng.git
+	branch = master
+	commit = d41d4aa8c63dea277e25c94ad85046b6c5335ccc
+	parent = cf9f301aafae715d2e9fe87c1cd3f5737a081537
+	method = merge
+	cmdver = 0.4.9
