@@ -6,6 +6,26 @@ This project implements a compiler that converts GDScript source code to RISC-V 
 
 ## Current Status (Latest Updates)
 
+✅ **ELF Execution Fix - Protection Fault Resolved**
+- Fixed critical ELF structure alignment issue that caused "Execution space protection fault"
+- ELF structure now correctly aligns with libriscv expectations: `sh_addr - p_vaddr == sh_offset - p_offset`
+- Generated ELF files now execute successfully in libriscv and return expected exit codes
+- ELF generator (`elf_generator.h/cpp`) fully functional and tested
+
+✅ **libriscv Integration and Testing**
+- Integrated libriscv (same library used by Godot sandbox) for ELF validation
+- `test_libriscv.cpp` provides direct testing of generated ELF files
+- Debug mode available via `DEBUG=1` environment variable
+- Built-in debugger support for instruction-by-instruction debugging
+- Validates that ELF files work correctly before integration with Godot sandbox
+
+✅ **Code Polish and Improvements**
+- Cleaned up comments and improved code organization in ELF generator
+- Simplified and clarified comments in RISC-V emitter
+- Made debug output optional in test_libriscv (controlled by DEBUG env var)
+- Used constexpr for constants in ELF generator
+- Improved code readability and consistency throughout
+
 ✅ **Codebase Refactored to Godot C++ Naming Conventions**
 - All methods use snake_case (e.g., `get_type()`, `emit_function()`)
 - All private members use `_` prefix (e.g., `_code_buffer`, `_stack_offset`)
@@ -32,14 +52,18 @@ This project implements a compiler that converts GDScript source code to RISC-V 
 ```
 GDScript Source Code
     ↓
-[cpp-peglib Parser] → AST (Abstract Syntax Tree)
+[Parser] → AST (Abstract Syntax Tree)
     ↓
 [Direct AST to RISC-V Emitter (biscuit)] → RISC-V 64 Machine Code
     ↓
-[Execute] → Register with Sandbox API
+[ELF Generator] → RISC-V 64 Linux ELF File
+    ↓
+[libriscv Execution] → Register with Sandbox API
 ```
 
 **Note**: Following BEAM JIT pattern - no MLIR/StableHLO dependency. Direct code generation from AST to RISC-V 64 Linux machine code using **biscuit** (similar to how BEAM JIT uses AsmJit).
+
+**Parser**: Currently using cpp-peglib (PEG parser generator). Planned migration to hand-written recursive descent parser for better error messages and simpler code (see "Parser Choice" section below).
 
 ### Architectural Decisions
 
@@ -138,6 +162,60 @@ GDScript → Callable → C++ Wrapper → Generated Assembly → int64 → Varia
 - For functions with parameters: May need syscall/helper approach
 - For complex return types: May need direct Variant construction in assembly
 - Inter-function calls: Function registry ready for this
+
+#### ELF Generation and Testing
+
+**Current State**: ELF generator implemented and tested with libriscv.
+
+**Status**: ✅ **FULLY IMPLEMENTED AND WORKING**
+
+**Implementation**:
+- `ELFGenerator` class creates RISC-V 64 Linux ELF executables (`elf_generator.h/cpp`)
+- Generates minimal ELF with proper program headers, section headers, and code sections
+- ELF structure correctly aligned for libriscv loading
+
+**ELF Structure Requirements**:
+The critical requirement for libriscv compatibility is maintaining the relationship:
+```
+sh_addr - p_vaddr == sh_offset - p_offset
+```
+
+This ensures that the offset from the segment base in memory equals the offset from the segment start in the file, which libriscv's `serialize_execute_segment()` requires.
+
+**ELF Layout**:
+- `p_offset = 0x0` (segment starts at file offset 0)
+- `p_vaddr = 0x10000` (segment base virtual address)
+- `p_filesz = aligned segment size` (includes ELF header + program headers + code)
+- `p_memsz = actual code size` (code only, not headers)
+- `.text sh_addr = p_vaddr + (sh_offset - p_offset)` (maintains offset relationship)
+- `entry_point = text_sh_addr` (entry point at start of .text section)
+
+**libriscv Testing**:
+- `test_libriscv.cpp` loads and executes generated ELF files
+- Uses the same `libriscv` library as Godot sandbox, ensuring compatibility
+- Validates that ELF files execute correctly and return expected exit codes
+- Supports debug mode: set `DEBUG=1` environment variable for verbose output
+- Built-in debugger available for step-by-step execution and register inspection
+
+**Testing Workflow**:
+```bash
+# Build test program
+cd programs/gdscript-native
+g++ -std=c++20 -I../../thirdparty/libriscv/lib \
+    -o test_libriscv test_libriscv.cpp -lriscv -framework Security
+
+# Run test (normal mode)
+./test_libriscv test_output/simple.elf
+
+# Run test (debug mode)
+DEBUG=1 ./test_libriscv test_output/simple.elf
+```
+
+**Benefits**:
+- Validates ELF structure before integration with Godot sandbox
+- Catches ELF generation issues early in development
+- Uses same library as production (Godot sandbox), ensuring compatibility
+- Debug mode helps troubleshoot execution issues
 
 ## Architectural Improvements Needed
 
@@ -429,8 +507,10 @@ struct CompilerOptions {
    - doctest framework setup (`tests/doctest.h`)
    - Comprehensive test suite (`tests/test_parser.cpp`, `tests/test_ast_building.cpp`)
    - Test script for external RISC-V toolchain (`test_riscv_assembly.sh`)
+   - **libriscv integration** (`test_libriscv.cpp`) - primary ELF validation method
    - Test CMake configuration
    - **Test Results**: Parser initialization passes, grammar parsing succeeds, AST building works
+   - **ELF Testing**: ELF files execute successfully in libriscv and return expected exit codes
 
 5. **Build System**
    - CMake integration (no MLIR/StableHLO dependencies - all removed)
@@ -563,6 +643,7 @@ struct CompilerOptions {
 ### Third-Party Libraries (via git subrepo)
 
 - **godot-dodo**: `thirdparty/godot-dodo/` - GDScript dataset with 60k+ samples
+- **libriscv**: `thirdparty/libriscv/` - RISC-V emulator library (same as used by Godot sandbox)
 
 ### External Libraries
 
@@ -572,7 +653,8 @@ struct CompilerOptions {
 
 ### Testing Tools (External)
 
-- **riscv64-linux-gnu-gcc**: RISC-V 64 Linux cross-compiler (for testing)
+- **libriscv**: Primary testing tool - validates ELF execution (integrated as git subrepo)
+- **riscv64-linux-gnu-gcc**: RISC-V 64 Linux cross-compiler (for assembly testing)
 - **qemu-riscv64**: RISC-V 64 emulator (optional, for execution testing)
 
 ## Build Instructions
@@ -692,28 +774,29 @@ No MLIR/StableHLO dependencies required - much simpler build!
 
 ## Immediate Next Steps (Priority Order)
 
-1. **Test with External RISC-V Toolchain** (READY)
-   - Run `test_riscv_assembly.sh` to validate generated assembly
-   - Verify assembly compiles and executes correctly
-   - Test with real GDScript samples
-
-2. **Extend RISC-V Emitter**
+1. **Extend RISC-V Emitter**
    - ✅ Comparison operators (==, !=, <, >, <=, >=) - **DONE**
+   - ✅ ELF generation and execution - **DONE**
    - Add logical operators (and, or, not)
    - Implement float literal support
    - Implement string literal support
 
-3. **Add Control Flow**
+2. **Add Control Flow**
    - Implement if/else statements
    - Implement for loops
    - Implement while loops
    - Add proper label management for branches
 
-4. **Extend Grammar**
+3. **Extend Grammar**
    - Add proper indentation handling
    - Add match statements
    - Add function call syntax
    - Add more GDScript features
+
+4. **Function Call Support**
+   - Generate RISC-V code to call other functions
+   - Support inter-function calls
+   - Use function registry for function lookup
 
 5. **Improve Stack Management**
    - Refine stack size calculation for complex functions
@@ -741,9 +824,11 @@ programs/gdscript-native/
 │   ├── ast.h           # AST node definitions
 │   └── errors.h/cpp    # Error handling (CompilationError, ErrorCollection)
 ├── ast_to_riscv_biscuit.h/cpp  # Direct AST to RISC-V 64 Linux emitter (using biscuit)
+├── elf_generator.h/cpp         # RISC-V 64 Linux ELF file generator
 ├── function_registry.h/cpp     # Function registry for calling convention
 ├── code_memory_manager.h/cpp   # Executable memory management (RAII)
 ├── test_data_loader.h/cpp      # Test data loader for godot-dodo dataset
+├── test_libriscv.cpp           # libriscv test program (ELF validation)
 ├── test_riscv_assembly.sh      # Test script for external RISC-V toolchain
 ├── main.cpp                    # Sandbox integration
 ├── CMakeLists.txt
@@ -751,14 +836,16 @@ programs/gdscript-native/
     ├── test_parser.cpp         # Parser tests
     ├── test_compiler.cpp       # TDD-style compiler tests
     ├── test_dataset.cpp        # Dataset tests
+    ├── test_elf_generation.cpp # ELF generation tests
     └── CMakeLists.txt
 
 thirdparty/
 ├── godot-dodo/         # GDScript dataset (git subrepo)
-└── biscuit/            # RISC-V code generator (header-only, similar to AsmJit)
+├── biscuit/            # RISC-V code generator (header-only, similar to AsmJit)
+└── libriscv/           # RISC-V emulator (used by Godot sandbox, git subrepo)
 ```
 
-**Note**: All deprecated MLIR-based code has been removed. The codebase now uses only direct AST → RISC-V compilation with biscuit.
+**Note**: All deprecated MLIR-based code has been removed. The codebase now uses only direct AST → RISC-V compilation with biscuit. ELF generation is fully functional and tested with libriscv.
 
 ## Testing Strategy
 
