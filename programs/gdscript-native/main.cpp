@@ -4,10 +4,8 @@
 #include <memory>
 #include <sstream>
 
-// Real MLIR (without LLVM backend)
-#include "mlir/mlir_wrapper.h"
-#include "mlir/ir_to_riscv.h"
-#include "ast_to_ir.h"
+// Direct AST to RISC-V emitter (no MLIR/StableHLO dependency)
+#include "ast_to_riscv.h"
 #include "test_data_loader.h"
 #include "parser/gdscript_parser.h"
 
@@ -37,12 +35,12 @@ static Variant compile_gdscript(String gdscript_code) {
 		return Nil;
 	}
 	
-	// Convert AST to MLIR
-	gdscript::ASTToIRConverter converter;
-	mlir::ModuleOp module = converter.convertProgram(ast.get());
+	// Convert AST directly to RISC-V assembly (no MLIR/StableHLO)
+	gdscript::ASTToRISCVEmitter emitter;
+	std::string assembly = emitter.emit(ast.get());
 	
-	if (!module) {
-		print("Error: Failed to convert AST to MLIR\n");
+	if (assembly.empty()) {
+		print("Error: Failed to emit RISC-V assembly\n");
 		return Nil;
 	}
 	
@@ -50,9 +48,6 @@ static Variant compile_gdscript(String gdscript_code) {
 	if (!ast->functions.empty()) {
 		print("First function: ", ast->functions[0]->name.c_str(), "\n");
 	}
-	
-	mlir::RISCVEmitter emitter;
-	std::string assembly = emitter.emitModule(module);
 	
 	AsmjitResult result = assemble_to(assembly.c_str(), assembly.size());
 	
@@ -161,7 +156,7 @@ static Variant get_random_test() {
 }
 
 int main() {
-	print("GDScript to RISC-V Compiler (using real MLIR)\n");
+	print("GDScript to RISC-V Compiler (direct AST to RISC-V, no MLIR)\n");
 	
 	// Add public API
 	ADD_API_FUNCTION(compile_gdscript, "Callable", "String gdscript_code", 

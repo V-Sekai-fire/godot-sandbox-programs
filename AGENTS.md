@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-This project implements a compiler that converts GDScript source code to RISC-V machine code using StableHLO (MLIR dialect) as an intermediate representation. The compiler is designed to work within the Godot Sandbox environment.
+This project implements a compiler that converts GDScript source code to RISC-V 64 Linux machine code using direct code generation (following BEAM JIT pattern). The compiler generates RISC-V assembly directly from the AST, eliminating the need for MLIR/StableHLO intermediate representation. The compiler is designed to work within the Godot Sandbox environment.
 
 ## Architecture
 
@@ -11,24 +11,25 @@ GDScript Source Code
     ↓
 [cpp-peglib Parser] → AST (Abstract Syntax Tree)
     ↓
-[AST to StableHLO Converter] → StableHLO IR
+[Direct AST to RISC-V Emitter] → RISC-V 64 Linux Assembly Text
     ↓
-[RISC-V Emitter] → Assembly Text
-    ↓
-[Assembler (libRiscvAsmLib)] → Machine Code
+[Assembler (libRiscvAsmLib)] → RISC-V 64 Machine Code
     ↓
 [Execute] → Register with Sandbox API
 ```
+
+**Note**: Following BEAM JIT pattern - no MLIR/StableHLO dependency. Direct code generation from AST to RISC-V 64 Linux.
 
 ## Current Implementation Status
 
 ### ✅ Completed Components
 
-1. **MLIR/StableHLO Integration**
-   - Real MLIR C++ API integration (no LLVM backend)
-   - StableHLO dialect support
-   - MLIR wrapper functions (`mlir_wrapper.h/cpp`)
-   - RISC-V assembly emitter (`ir_to_riscv.h/cpp`)
+1. **Direct AST to RISC-V 64 Linux Emitter** (Replaces MLIR/StableHLO)
+   - Direct code generation from AST (following BEAM JIT pattern)
+   - No MLIR/StableHLO dependency - simpler and faster
+   - Handwritten RISC-V 64 Linux assembly templates (`ast_to_riscv.h/cpp`)
+   - Follows RISC-V 64 Linux ABI and calling conventions
+   - Supports: functions, returns, literals, identifiers, binary operations, variable declarations
 
 2. **Parser Grammar**
    - cpp-peglib integration (`parser/peglib.h`)
@@ -44,13 +45,13 @@ GDScript Source Code
 
 4. **Testing Infrastructure**
    - doctest framework setup (`tests/doctest.h`)
-   - Comprehensive test suite (`tests/test_parser.cpp`, `tests/test_adhoc.cpp`)
+   - Comprehensive test suite (`tests/test_parser.cpp`, `tests/test_ast_building.cpp`)
+   - Test script for external RISC-V toolchain (`test_riscv_assembly.sh`)
    - Test CMake configuration
-   - **Test Results**: Parser initialization passes, grammar parsing succeeds, but AST building not implemented
+   - **Test Results**: Parser initialization passes, grammar parsing succeeds, AST building works
 
 5. **Build System**
-   - CMake integration
-   - MLIR and StableHLO dependency management
+   - CMake integration (no MLIR/StableHLO dependencies)
    - RISC-V assembler library linking
    - Parser files integrated into build
 
@@ -62,30 +63,41 @@ GDScript Source Code
      - Semantic actions use `std::shared_ptr` and helper structs (BinaryOpData, FunctionData, ProgramData)
      - Conversion functions convert from `shared_ptr` (semantic actions) to `unique_ptr` (final AST)
      - Parser successfully builds AST with functions, statements, and expressions
-   - **Workaround**: cpp-peglib doesn't store Program semantic value in parse result, so we use a global variable workaround
+   - **Workaround**: cpp-peglib doesn't store Program semantic value in parse result, so we use a member variable workaround
    - **Verified**: All basic AST building tests pass (simple functions, parameters, binary operations, variable declarations)
    - **Known Issues**: 
      - cpp-peglib semantic value storage issue (workaround in place)
-     - Debug output still present (should be removed for production)
 
-2. **AST to MLIR Conversion** (READY FOR TESTING)
-   - Code fully implemented and ready to test
-   - Supports: functions, return statements, literals, identifiers, binary operations, variable declarations
-   - Missing: control flow, function calls, complex expressions, type system
+2. **Direct AST to RISC-V 64 Linux Emitter** (COMPLETED)
+   - **Status**: Fully implemented following BEAM JIT pattern
+   - **Implementation**:
+     - Handwritten RISC-V assembly templates (`ast_to_riscv.h/cpp`)
+     - Direct code generation from AST nodes (no MLIR/StableHLO dependency)
+     - Follows RISC-V 64 Linux ABI and calling conventions
+     - Proper stack frame management with dynamic stack size tracking
+     - Register allocation using temporary registers (t0-t6) and stack spilling
+   - **Supports**: 
+     - Functions with parameters (a0-a7)
+     - Return statements (a0 return value)
+     - Literals (integers, booleans, null)
+     - Identifiers (variable references)
+     - Binary operations (+, -, *, /, %)
+     - Variable declarations with initializers
+   - **Testing**: Test script created for external RISC-V toolchain validation
+   - **Missing**: 
+     - Control flow (if/else, loops)
+     - Function calls
+     - Float literals (converted to int)
+     - String literals
+     - Comparison operators
 
 ### ⚠️ Partially Implemented
 
-1. **AST to MLIR Testing**
-   - Code exists and should work, but requires MLIR build to test
-   - Test infrastructure in place (`test_ast_to_mlir.cpp`)
-   - Need to verify with actual MLIR build
-
-### ❌ Missing Components
-
-1. **AST Building Implementation**
-   - Semantic actions not implemented
-   - Need to convert parse results to AST nodes
-   - Critical blocker for all downstream functionality
+1. **Testing Infrastructure**
+   - Parser and AST building tests implemented and passing
+   - Test script for external RISC-V toolchain created (`test_riscv_assembly.sh`)
+   - Integration tests need to be run with actual RISC-V toolchain
+   - End-to-end compilation tests ready but need verification
 
 ### ❌ Missing Components
 
@@ -95,42 +107,53 @@ GDScript Source Code
    - Full type system
    - Advanced features (signals, enums, classes, etc.)
 
-2. **Advanced AST to MLIR Features**
-   - Control flow conversion
+2. **Advanced AST to RISC-V Features**
+   - Control flow conversion (if/else, loops)
    - Function call handling
-   - SSA conversion for complex code
+   - Float literal support (currently converted to int)
+   - String literal support
+   - Comparison operators (==, !=, <, >, <=, >=)
+   - Logical operators (and, or, not)
    - Type system integration
 
 ## Dependencies
 
 ### Third-Party Libraries (via git subrepo)
 
-- **StableHLO**: `thirdparty/stablehlo/` - MLIR dialect for ML compute operations
-- **LLVM Project**: `thirdparty/llvm-project/` - Required by StableHLO for MLIR
 - **godot-dodo**: `thirdparty/godot-dodo/` - GDScript dataset with 60k+ samples
 
 ### External Libraries
 
-- **cpp-peglib**: Single-file header-only PEG parser (to be added)
-- **doctest**: Header-only testing framework (to be added)
+- **cpp-peglib**: Single-file header-only PEG parser (integrated)
+- **doctest**: Header-only testing framework (integrated)
 - **libRiscvAsmLib.a**: RISC-V assembler library (already integrated)
+
+### Testing Tools (External)
+
+- **riscv64-linux-gnu-gcc**: RISC-V 64 Linux cross-compiler (for testing)
+- **qemu-riscv64**: RISC-V 64 emulator (optional, for execution testing)
 
 ## Build Instructions
 
 ### Prerequisites
 
-1. Build MLIR and StableHLO (see `thirdparty/README.md`)
-2. Ensure CMake can find MLIR and StableHLO
+1. CMake 3.10 or higher
+2. C++ compiler with C++17 support
+3. (Optional) RISC-V 64 Linux toolchain for testing:
+   ```bash
+   # Ubuntu/Debian
+   sudo apt-get install gcc-riscv64-linux-gnu qemu-user-static
+   ```
 
 ### Build Steps
 
 ```bash
 cd build
-cmake .. \
-  -DMLIR_DIR=${PWD}/../thirdparty/llvm-build/lib/cmake/mlir \
-  -DSTABLEHLO_DIR=${PWD}/../thirdparty/stablehlo/build/lib/cmake/stablehlo
+cmake ..
 cmake --build .
 ```
+
+No MLIR/StableHLO dependencies required - much simpler build!
 
 ## API Documentation
 
@@ -161,21 +184,25 @@ cmake --build .
 - [ ] Full GDScript grammar (control flow, types, indentation, etc.) - incremental work
 - [ ] Handle indentation-based blocks properly
 
-### Phase 4: AST to MLIR Conversion (Completed - Basic)
-- [x] Implement AST traversal
-- [x] Convert AST nodes to StableHLO operations (basic: literals, identifiers, binary ops)
-- [x] Handle variable mapping
-- [x] Replace placeholder functions in ASTToIRConverter
+### Phase 4: AST to RISC-V Emitter (Completed - Basic)
+- [x] Implement direct AST to RISC-V 64 Linux assembly emitter
+- [x] Handwritten instruction templates (following BEAM JIT pattern)
+- [x] RISC-V 64 Linux ABI compliance
+- [x] Stack frame management
+- [x] Register allocation
+- [x] Support for: functions, returns, literals, identifiers, binary operations, variable declarations
+- [ ] Control flow support (if/else, loops)
+- [ ] Function calls
 - [ ] Full type system support
-- [ ] SSA conversion for complex control flow
 
-### Phase 5: Testing (Completed - Infrastructure)
+### Phase 5: Testing (In Progress)
 - [x] Write doctest test infrastructure
-- [x] Basic parser tests created
-- [x] Test infrastructure ready for dataset testing
+- [x] Basic parser tests created and passing
+- [x] AST building tests created and passing
+- [x] Test script for external RISC-V toolchain created
 - [x] Integration with main.cpp for end-to-end testing
-- [ ] Run and verify tests compile (requires build)
-- [ ] Test with godot-dodo dataset samples (requires working parser)
+- [ ] Run external toolchain tests
+- [ ] Test with godot-dodo dataset samples
 
 ## Known Limitations
 
@@ -185,74 +212,90 @@ cmake --build .
 
 3. **Indentation Handling**: GDScript uses indentation for blocks - current grammar uses newlines, needs enhancement for real GDScript code.
 
-4. **Type System**: Full GDScript type system support pending.
+4. **Type System**: Full GDScript type system support pending. Currently all values default to 64-bit integers.
 
-5. **AST to MLIR Conversion**: Code exists and should work, but needs testing with actual MLIR build to verify.
+5. **RISC-V Emitter Limitations**:
+   - Float literals are converted to integers
+   - String literals not yet implemented
+   - Comparison and logical operators not yet implemented
+   - Function calls not yet implemented
+   - Control flow (if/else, loops) not yet implemented
 
-6. **End-to-End Compilation**: Ready to test once AST to MLIR is verified.
+6. **Stack Management**: Stack size tracking improved but may need further refinement for complex functions with many local variables.
 
 ## Immediate Next Steps (Priority Order)
 
-1. **Test AST to MLIR Conversion** (IN PROGRESS)
-   - Code is implemented and should work
-   - Need to test with actual MLIR build
-   - Verify conversion works for: functions, returns, literals, identifiers, binary operations, variable declarations
-   - Run systematic tests with doctest
+1. **Test with External RISC-V Toolchain** (READY)
+   - Run `test_riscv_assembly.sh` to validate generated assembly
+   - Verify assembly compiles and executes correctly
+   - Test with real GDScript samples
 
-2. **Remove Debug Output**
-   - Remove or make conditional all debug `std::cout` statements
-   - Keep only essential error reporting
+2. **Extend RISC-V Emitter**
+   - Add comparison operators (==, !=, <, >, <=, >=)
+   - Add logical operators (and, or, not)
+   - Implement float literal support
+   - Implement string literal support
 
-3. **Investigate cpp-peglib Issue**
-   - Research why Program semantic value isn't stored in parse result
-   - Find proper solution instead of global variable workaround
-   - May need to file issue with cpp-peglib or use different approach
+3. **Add Control Flow**
+   - Implement if/else statements
+   - Implement for loops
+   - Implement while loops
+   - Add proper label management for branches
 
-4. **Test End-to-End Compilation**
-   - Verify full pipeline: GDScript → AST → StableHLO → RISC-V → Execution
-   - Test with real GDScript samples from godot-dodo dataset
-
-5. **Extend Grammar**
-   - Add control flow (if/else, loops)
+4. **Extend Grammar**
    - Add proper indentation handling
    - Add match statements
+   - Add function call syntax
    - Add more GDScript features
+
+5. **Improve Stack Management**
+   - Refine stack size calculation for complex functions
+   - Optimize register allocation
+   - Add stack overflow detection
 
 ## Future Work
 
 - Full GDScript language support
-- Optimizations in StableHLO IR
+- Control flow optimizations
 - Better error reporting
 - Support for more complex GDScript features (classes, signals, enums, etc.)
 - Test with real godot-dodo dataset samples
+- Register allocation optimizations
+- Stack frame optimizations
 
 ## Files Structure
 
 ```
 programs/gdscript-native/
-├── parser/              # Parser implementation (to be created)
+├── parser/              # Parser implementation
 │   ├── peglib.h        # cpp-peglib header
 │   ├── gdscript_parser.h/cpp
 │   └── ast.h           # AST node definitions
-├── mlir/               # MLIR/StableHLO integration
-│   ├── mlir_wrapper.h/cpp
-│   └── ir_to_riscv.h/cpp
-├── ast_to_ir.h/cpp     # AST to MLIR converter
+├── ast_to_riscv.h/cpp  # Direct AST to RISC-V 64 Linux emitter
 ├── test_data_loader.h/cpp
+├── test_riscv_assembly.sh  # Test script for external RISC-V toolchain
 ├── main.cpp
 └── CMakeLists.txt
 
 thirdparty/
-├── stablehlo/          # StableHLO (git subrepo)
-├── llvm-project/       # LLVM project (git subrepo)
 ├── godot-dodo/         # GDScript dataset (git subrepo)
-└── llvm-build/         # LLVM build directory
+└── asm/                # RISC-V assembler library
+    └── libRiscvAsmLib.a
 ```
 
 ## Testing Strategy
 
-- **Doctest Framework**: Systematic unit testing before and after each implementation step
+- **Doctest Framework**: Systematic unit testing for parser and AST building
+- **External Toolchain Testing**: Use `test_riscv_assembly.sh` to validate generated RISC-V assembly with `riscv64-linux-gnu-gcc`
 - **Adhoc Testing**: Manual testing during development
 - **Dataset Testing**: Test with real GDScript samples from godot-dodo
-- **Integration Testing**: Full compilation pipeline testing
+- **Integration Testing**: Full compilation pipeline testing (GDScript → AST → RISC-V → Machine Code)
+
+### Running Tests
+
+```bash
+# Test with external RISC-V toolchain
+cd programs/gdscript-native
+./test_riscv_assembly.sh
+```
 

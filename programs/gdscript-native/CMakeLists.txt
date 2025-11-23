@@ -1,28 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 project(gdscript-native)
 
-# Find MLIR (required by StableHLO)
-# MLIR_DIR should be set to the build directory's lib/cmake/mlir
-# If using git subrepo, default to thirdparty/llvm-build/lib/cmake/mlir
-if(NOT DEFINED MLIR_DIR)
-	set(MLIR_DIR "${CMAKE_SOURCE_DIR}/thirdparty/llvm-build/lib/cmake/mlir")
-endif()
-
-find_package(MLIR REQUIRED CONFIG)
-
-# Find StableHLO
-# STABLEHLO_DIR should be set to the build directory's lib/cmake/stablehlo
-# If using git subrepo, default to thirdparty/stablehlo/build/lib/cmake/stablehlo
-if(NOT DEFINED STABLEHLO_DIR)
-	set(STABLEHLO_DIR "${CMAKE_SOURCE_DIR}/thirdparty/stablehlo/build/lib/cmake/stablehlo")
-endif()
-
-find_package(StableHLO REQUIRED CONFIG)
-
-message(STATUS "Using MLIR: ${MLIR_DIR}")
-message(STATUS "MLIR libraries: ${MLIR_LIBS}")
-message(STATUS "Using StableHLO: ${StableHLO_DIR}")
-message(STATUS "StableHLO libraries: ${StableHLO_LIBS}")
+# No MLIR/StableHLO dependency - direct AST to RISC-V emission (following BEAM JIT pattern)
 
 # Add the RISC-V asmjit static library (for assemble_to function)
 add_library(riscv_asmjit STATIC IMPORTED)
@@ -50,19 +29,14 @@ target_link_libraries(riscv_asmjit INTERFACE zlibstatic)
 # Build the gdscript-native sandbox program
 add_ci_program(gdscript_native
 	main.cpp
-	mlir/mlir_wrapper.cpp
-	mlir/ir_to_riscv.cpp
-	ast_to_ir.cpp
+	ast_to_riscv.cpp
 	test_data_loader.cpp
 	parser/gdscript_parser.cpp
 )
 
-# Link with MLIR, StableHLO, and RISC-V assembler library
-mlir_setup_definitions(gdscript_native)
+# Link with RISC-V assembler library (no MLIR/StableHLO)
 target_link_libraries(gdscript_native PRIVATE
 	riscv_asmjit
-	${MLIR_LIBS}
-	${StableHLO_LIBS}
 )
 
 if (ZIG_COMPILER)
