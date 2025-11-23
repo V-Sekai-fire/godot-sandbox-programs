@@ -2,7 +2,30 @@
 
 ## Project Overview
 
-This project implements a compiler that converts GDScript source code to RISC-V 64 Linux machine code using direct code generation (following BEAM JIT pattern). The compiler generates RISC-V assembly directly from the AST, eliminating the need for MLIR/StableHLO intermediate representation. The compiler is designed to work within the Godot Sandbox environment.
+This project implements a compiler that converts GDScript source code to RISC-V 64 Linux machine code using direct code generation (following BEAM JIT pattern). The compiler generates RISC-V machine code directly from the AST using the **biscuit** library, eliminating the need for MLIR/StableHLO intermediate representation. The compiler is designed to work within the Godot Sandbox environment.
+
+## Current Status (Latest Updates)
+
+✅ **Codebase Refactored to Godot C++ Naming Conventions**
+- All methods use snake_case (e.g., `get_type()`, `emit_function()`)
+- All private members use `_` prefix (e.g., `_code_buffer`, `_stack_offset`)
+- All private methods use `_` prefix (e.g., `_allocate_register()`)
+- Consistent with Godot engine code style throughout
+
+✅ **All Deprecated Code Removed**
+- Entire `deprecated/` directory deleted (MLIR-based code)
+- MLIR-based test files removed
+- CMakeLists.txt cleaned up (no MLIR dependencies)
+- Codebase now uses only direct AST → RISC-V compilation with biscuit
+
+✅ **Core Features Implemented**
+- Direct AST to RISC-V machine code generation (biscuit)
+- Function registry and calling convention
+- Memory management (RAII)
+- Structured error handling
+- Comparison operators (==, !=, <, >, <=, >=)
+- Dynamic stack size tracking
+- Buffer growth strategy
 
 ## Architecture
 
@@ -105,10 +128,11 @@ GDScript → Callable → C++ Wrapper → Generated Assembly → int64 → Varia
 
 **Implementation**:
 - `FunctionRegistry` class created (`function_registry.h/cpp`)
-- `callAssemblyFunction()` helper implemented
+- `call_assembly_function()` helper implemented (Godot C++ naming)
 - C++ wrapper generation in `compile_gdscript()`
 - Functions registered and wrappers created automatically
 - int64 → Variant conversion in wrappers
+- All methods use snake_case naming (Godot C++ conventions)
 
 **Future Considerations**:
 - For functions with parameters: May need syscall/helper approach
@@ -178,11 +202,14 @@ class CompilationError {
 **Status**: ✅ **IMPLEMENTED**
 
 **Implementation**:
-- Moved `ast_to_ir.cpp/h` to `deprecated/` (MLIR-based, deprecated)
-- Moved `ast_to_riscv.cpp/h` to `deprecated/` (old assembly text emitter)
-- Moved `mlir/` directory to `deprecated/` (MLIR integration, deprecated)
-- Created `deprecated/README.md` explaining what was moved and why
+- **Removed** all deprecated MLIR-based code:
+  - Deleted `ast_to_ir.cpp/h` (MLIR-based AST to IR conversion)
+  - Deleted `ast_to_riscv.cpp/h` (old RISC-V assembly text emitter)
+  - Deleted entire `mlir/` directory (MLIR integration code)
+  - Deleted MLIR-based test files (`test_integration.cpp`, `test_ast_to_mlir.cpp`)
+- Cleaned up `tests/CMakeLists.txt` to remove MLIR/StableHLO dependencies
 - Only one code generation path exists: `ast_to_riscv_biscuit.h/cpp`
+- Codebase now uses only direct AST → RISC-V compilation (BEAM JIT pattern)
 
 ### 4. Visitor Pattern for AST Traversal
 
@@ -349,7 +376,7 @@ struct CompilerOptions {
 **Completed**:
 - ✅ **Function Registry**: `FunctionRegistry` class tracks compiled functions (`function_registry.h/cpp`)
 - ✅ **Calling Convention**: C++ wrapper functions convert int64 → Variant
-- ✅ **Function Lookup**: `getFunction()` resolves function names to addresses
+- ✅ **Function Lookup**: `get_function()` resolves function names to addresses (snake_case)
 
 **Remaining**:
 - **Function Call Code Generation**: Generate RISC-V code to call other functions
@@ -376,13 +403,14 @@ struct CompilerOptions {
 
 ### ✅ Completed Components
 
-1. **Direct AST to RISC-V 64 Linux Emitter using biscuit** (Replaces MLIR/StableHLO)
+1. **Direct AST to RISC-V 64 Linux Emitter using biscuit** ✅ **COMPLETED**
    - Direct code generation from AST to machine code (following BEAM JIT pattern)
    - Uses **biscuit** library (MIT license) - similar to AsmJit used in BEAM JIT
-   - No MLIR/StableHLO dependency - simpler and faster
+   - **No MLIR/StableHLO dependency** - all deprecated code removed
    - Generates RISC-V 64 Linux machine code directly (`ast_to_riscv_biscuit.h/cpp`)
    - Follows RISC-V 64 Linux ABI and calling conventions
-   - Supports: functions, returns, literals, identifiers, binary operations, variable declarations
+   - Uses Godot C++ naming conventions (snake_case, _ prefix for private members)
+   - Supports: functions, returns, literals, identifiers, binary operations, variable declarations, comparison operators
    - **Key advantage**: Generates machine code directly (like BEAM JIT), no text assembly step needed
 
 2. **Parser Grammar**
@@ -405,9 +433,17 @@ struct CompilerOptions {
    - **Test Results**: Parser initialization passes, grammar parsing succeeds, AST building works
 
 5. **Build System**
-   - CMake integration (no MLIR/StableHLO dependencies)
-   - RISC-V assembler library linking
+   - CMake integration (no MLIR/StableHLO dependencies - all removed)
+   - biscuit library integration (header-only, no linking needed)
    - Parser files integrated into build
+   - Clean test configuration (no MLIR dependencies)
+
+6. **Code Style and Naming Conventions** ✅ **COMPLETED**
+   - Refactored entire codebase to use Godot C++ naming conventions
+   - All methods use snake_case (e.g., `get_type()`, `emit_function()`)
+   - All private members use `_` prefix (e.g., `_code_buffer`, `_stack_offset`)
+   - All private methods use `_` prefix (e.g., `_allocate_register()`)
+   - Consistent with Godot engine code style
 
 ### ✅ Completed Components (Updated)
 
@@ -443,6 +479,8 @@ struct CompilerOptions {
      - Comparison operators (==, !=, <, >, <=, >=) ✅ **ADDED**
      - Improved stack size calculation with dynamic tracking ✅ **IMPROVED**
      - Improved register allocation with cleanup ✅ **IMPROVED**
+     - Buffer growth strategy (grows when 90% full) ✅ **ADDED**
+     - Godot C++ naming conventions throughout ✅ **REFACTORED**
    - **Missing**: 
      - Control flow (if/else, loops)
      - Function calls
@@ -453,9 +491,10 @@ struct CompilerOptions {
 
 1. **Godot Sandbox Calling Convention** ✅ **COMPLETED**
    - `FunctionRegistry` class to track compiled function addresses
-   - `callAssemblyFunction()` helper to call assembly and get int64 result
+   - `call_assembly_function()` helper to call assembly and get int64 result
    - C++ wrapper generation in `compile_gdscript()` that converts int64 → Variant
    - Functions automatically registered and wrappers created
+   - All methods use snake_case naming (Godot C++ conventions)
    - Files: `function_registry.h/cpp`
 
 2. **Memory Management** ✅ **COMPLETED**
@@ -474,15 +513,25 @@ struct CompilerOptions {
    - Files: `parser/errors.h/cpp`
 
 4. **Code Organization Cleanup** ✅ **COMPLETED**
-   - Legacy files moved to `deprecated/` directory
+   - **Removed** all deprecated MLIR-based code (entire `deprecated/` directory deleted)
+   - Removed MLIR-based test files
+   - Cleaned up CMakeLists.txt to remove MLIR dependencies
    - Only one code generation path: `ast_to_riscv_biscuit.h/cpp`
-   - Clear documentation of deprecated files
+   - Codebase now uses only direct AST → RISC-V compilation
 
 5. **RISC-V Emitter Improvements** ✅ **COMPLETED**
    - Comparison operators implemented (==, !=, <, >, <=, >=)
    - Stack size calculation improved with dynamic tracking
    - Register allocation improved with cleanup notes
-   - Buffer growth strategy added
+   - Buffer growth strategy added (grows when 90% full)
+   - All methods refactored to snake_case with _ prefix for private
+
+6. **Code Style Refactoring** ✅ **COMPLETED**
+   - Entire codebase refactored to Godot C++ naming conventions
+   - All methods: camelCase → snake_case (e.g., `getType()` → `get_type()`)
+   - All private members: added `_` prefix (e.g., `codeBuffer` → `_code_buffer`)
+   - All private methods: added `_` prefix (e.g., `emitFunction()` → `_emit_function()`)
+   - Consistent with Godot engine code style throughout
 
 ### ⚠️ Partially Implemented
 
@@ -582,15 +631,17 @@ No MLIR/StableHLO dependencies required - much simpler build!
 - [ ] Handle indentation-based blocks properly
 
 ### Phase 4: AST to RISC-V Emitter (In Progress - Improvements)
-- [x] Implement direct AST to RISC-V 64 Linux assembly emitter
+- [x] Implement direct AST to RISC-V 64 Linux machine code emitter
 - [x] Handwritten instruction templates (following BEAM JIT pattern)
 - [x] RISC-V 64 Linux ABI compliance
 - [x] Stack frame management
 - [x] Register allocation
 - [x] Support for: functions, returns, literals, identifiers, binary operations, variable declarations
-- [ ] Fix stack size calculation (track dynamic growth)
-- [ ] Improve register allocation (liveness tracking, cleanup)
-- [ ] Add comparison operators (==, !=, <, >, <=, >=)
+- [x] Fix stack size calculation (track dynamic growth) ✅
+- [x] Improve register allocation (cleanup notes added) ✅
+- [x] Add comparison operators (==, !=, <, >, <=, >=) ✅
+- [x] Buffer growth strategy (grows when 90% full) ✅
+- [x] Refactor to Godot C++ naming conventions ✅
 - [ ] Control flow support (if/else, loops)
 - [ ] Function calls
 - [ ] Full type system support
@@ -608,8 +659,17 @@ No MLIR/StableHLO dependencies required - much simpler build!
 
 ### Phase 6: Documentation (In Progress)
 - [x] Document architectural decisions (AST → RISC-V, not bytecode)
-- [ ] Update README.md to reflect biscuit-based architecture
+- [x] Update AGENTS.md to reflect current state (deprecated code removed, naming conventions)
+- [ ] Update README.md to reflect biscuit-based architecture (remove MLIR/StableHLO references)
 - [ ] Consolidate status files (CURRENT_STATUS.md, IMPLEMENTATION_STATUS.md)
+
+### Phase 7: Code Cleanup ✅ **COMPLETED**
+- [x] Remove all deprecated MLIR-based code
+- [x] Remove MLIR-based test files
+- [x] Clean up CMakeLists.txt (remove MLIR dependencies)
+- [x] Refactor to Godot C++ naming conventions
+- [x] Update all method names to snake_case
+- [x] Add _ prefix to all private members and methods
 
 ## Known Limitations
 
@@ -638,7 +698,7 @@ No MLIR/StableHLO dependencies required - much simpler build!
    - Test with real GDScript samples
 
 2. **Extend RISC-V Emitter**
-   - Add comparison operators (==, !=, <, >, <=, >=)
+   - ✅ Comparison operators (==, !=, <, >, <=, >=) - **DONE**
    - Add logical operators (and, or, not)
    - Implement float literal support
    - Implement string literal support
@@ -678,18 +738,27 @@ programs/gdscript-native/
 ├── parser/              # Parser implementation
 │   ├── peglib.h        # cpp-peglib header
 │   ├── gdscript_parser.h/cpp
-│   └── ast.h           # AST node definitions
+│   ├── ast.h           # AST node definitions
+│   └── errors.h/cpp    # Error handling (CompilationError, ErrorCollection)
 ├── ast_to_riscv_biscuit.h/cpp  # Direct AST to RISC-V 64 Linux emitter (using biscuit)
-├── test_data_loader.h/cpp
-├── test_riscv_assembly.sh  # Test script for external RISC-V toolchain
-├── main.cpp
-└── CMakeLists.txt
+├── function_registry.h/cpp     # Function registry for calling convention
+├── code_memory_manager.h/cpp   # Executable memory management (RAII)
+├── test_data_loader.h/cpp      # Test data loader for godot-dodo dataset
+├── test_riscv_assembly.sh      # Test script for external RISC-V toolchain
+├── main.cpp                    # Sandbox integration
+├── CMakeLists.txt
+└── tests/                      # Test suite
+    ├── test_parser.cpp         # Parser tests
+    ├── test_compiler.cpp       # TDD-style compiler tests
+    ├── test_dataset.cpp        # Dataset tests
+    └── CMakeLists.txt
 
 thirdparty/
 ├── godot-dodo/         # GDScript dataset (git subrepo)
-└── asm/                # RISC-V assembler library
-    └── libRiscvAsmLib.a
+└── biscuit/            # RISC-V code generator (header-only, similar to AsmJit)
 ```
+
+**Note**: All deprecated MLIR-based code has been removed. The codebase now uses only direct AST → RISC-V compilation with biscuit.
 
 ## Testing Strategy
 
