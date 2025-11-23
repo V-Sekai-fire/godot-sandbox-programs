@@ -10,6 +10,7 @@
 #include "parser/gdscript_parser.h"
 #include "function_registry.h"
 #include "code_memory_manager.h"
+#include "elf_generator.h"
 
 using AsmCallback = Variant(*)();
 
@@ -19,7 +20,7 @@ static gdscript::FunctionRegistry g_functionRegistry;
 // Global memory manager to track executable memory allocations
 static gdscript::CodeMemoryManager g_memoryManager;
 
-// Compile a simple GDScript-like function to RISC-V and return a callable
+// Compile GDScript to RISC-V ELF file (following Godot sandbox calling convention)
 static Variant compile_gdscript(String gdscript_code) {
 	// Parse GDScript code to AST
 	gdscript::GDScriptParser parser;
@@ -52,68 +53,54 @@ static Variant compile_gdscript(String gdscript_code) {
 	}
 	print("Generated ", codeSize, " bytes of RISC-V machine code\n");
 	
-	// Allocate executable memory using memory manager (RAII, auto cleanup)
-	gdscript::ExecutableMemory* execMem = g_memoryManager.allocate(codeSize);
+	// Generate ELF file from machine code
+	gdscript::ELFGenerator elf_gen;
+	elf_gen.add_code_section(machineCode, codeSize, ".text");
 	
-	if (!execMem || !execMem->is_valid()) {
-		print("Error: Failed to allocate executable memory\n");
-		return Nil;
-	}
-	
-	// Copy machine code into executable memory
-	execMem->copy(machineCode, codeSize);
-	void* executable = execMem->get();
-	
-	// Register the function(s) in the registry
-	// For now, if there's a single function, register it by name
-	// Otherwise, register as "main" or the first function
-	if (!ast->functions.empty()) {
-		std::string funcName = ast->functions[0]->name;
+	// Add function symbols for sandbox to discover
+	// Functions are at entry point (0x10000) for now
+	// TODO: Calculate actual function addresses when we support multiple functions
+	uint64_t func_address = 0x10000;
+	for (const auto& func : ast->functions) {
+		std::string funcName = func->name;
 		if (funcName.empty()) {
 			funcName = "main";
 		}
-		g_functionRegistry.register_function(funcName, executable, codeSize);
-		print("Registered function: ", funcName.c_str(), "\n");
-		
-		// Create C++ wrapper that calls assembly and converts int64 to Variant
-		auto wrapper = [funcName]() -> Variant {
-			void* funcAddr = g_functionRegistry.get_function(funcName);
-			if (!funcAddr) {
-				print("Error: Function not found in registry: ", funcName.c_str(), "\n");
-				return Nil;
-			}
-			
-			// Call assembly function and get int64 result
-			int64_t result = gdscript::call_assembly_function(funcAddr);
-			
-			// Convert int64 to Variant
-			return Variant(result);
-		};
-		
-		// Create callable from wrapper
-		return Callable::Create<Variant()>(wrapper);
-	} else {
-		// No functions, just return a callable that returns 0
-		AsmCallback callback = (AsmCallback)executable;
-		return Callable::Create<Variant()>(callback);
+		// For now, all functions start at entry point
+		// TODO: Calculate proper offsets when we support multiple functions
+		elf_gen.add_symbol(funcName, func_address, codeSize);
 	}
+	
+	// Generate ELF file
+	std::vector<uint8_t> elf_data = elf_gen.generate();
+	if (elf_data.empty()) {
+		print("Error: Failed to generate ELF file\n");
+		return Nil;
+	}
+	
+	print("Generated ELF file: ", elf_data.size(), " bytes\n");
+	
+	// Convert to PackedByteArray for Godot
+	PackedByteArray result;
+	result.resize(elf_data.size());
+	std::memcpy(result.ptrw(), elf_data.data(), elf_data.size());
+	
+	return result;
 }
 
 // Test function: compile and call a simple function
 static Variant test_compile() {
 	print("Testing GDScript to RISC-V compilation...\n");
 	
-	// Create a simple function: func hello() -> int: return 42
-	String testCode = "func hello() -> int:\n    return 42\n";
+	// Create a simple function: func hello(): return 42
+	String testCode = "func hello():\n    return 42\n";
 	
-	Variant callable = compile_gdscript(testCode);
+	Variant result = compile_gdscript(testCode);
 	
-	if (callable.get_type() == Variant::Type::CALLABLE) {
-		print("Compilation successful! Calling function...\n");
-		Callable c = callable;
-		Variant result = c.call();
-		print("Result: ", result, "\n");
-		return result;
+	if (result.get_type() == Variant::Type::PACKED_BYTE_ARRAY) {
+		PackedByteArray elf_data = result;
+		print("Compilation successful! Generated ELF file: ", elf_data.size(), " bytes\n");
+		return Variant(elf_data.size()); // Return size as success indicator
 	} else {
 		print("Compilation failed\n");
 		return Nil;
@@ -189,7 +176,7 @@ int main() {
 	print("GDScript to RISC-V Compiler (direct AST to RISC-V, no MLIR)\n");
 	
 	// Add public API
-	ADD_API_FUNCTION(compile_gdscript, "Callable", "String gdscript_code", 
+	ADD_API_FUNCTION(compile_gdscript, "PackedByteArray", "String gdscript_code", 
 	                 "Compile GDScript to RISC-V and return a callable function");
 	ADD_API_FUNCTION(test_compile, "Variant", "", 
 	                 "Test the compilation system with a simple function");

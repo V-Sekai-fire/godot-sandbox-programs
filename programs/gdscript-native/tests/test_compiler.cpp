@@ -6,6 +6,7 @@
 #include "../code_memory_manager.h"
 #include <string>
 #include <memory>
+#include <vector>
 #include <cstring>
 #include <sys/mman.h>
 
@@ -15,15 +16,17 @@ using namespace gdscript;
 struct CompilationResult {
     bool success;
     std::unique_ptr<ProgramNode> ast;
-    const uint8_t* code;
+    std::vector<uint8_t> code;  // Own the code buffer to keep it alive
     size_t codeSize;
     std::string errorMessage;
+    
+    // Get pointer to code for execution
+    const uint8_t* get_code_ptr() const { return code.data(); }
 };
 
 CompilationResult compileGDScript(const std::string& source) {
     CompilationResult result;
     result.success = false;
-    result.code = nullptr;
     result.codeSize = 0;
     
     // Parse
@@ -48,9 +51,38 @@ CompilationResult compileGDScript(const std::string& source) {
         return result;
     }
     
-    result.success = true;
-    result.code = code;
+    // Copy code to our own buffer (emitter's buffer will go out of scope)
+    result.code.resize(size);
+    std::memcpy(result.code.data(), code, size);
     result.codeSize = size;
+    result.success = true;
+    return result;
+}
+
+// Helper to execute generated RISC-V code and get result
+int64_t execute_generated_code(const uint8_t* code, size_t size) {
+    if (code == nullptr || size == 0) {
+        return 0;
+    }
+    
+    // Allocate executable memory with mmap
+    void* execMem = mmap(nullptr, size, PROT_READ | PROT_WRITE | PROT_EXEC, 
+                         MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (execMem == MAP_FAILED) {
+        return 0;
+    }
+    
+    // Copy code to executable memory
+    std::memcpy(execMem, code, size);
+    
+    // Cast to function pointer and call
+    using FuncPtr = int64_t(*)();
+    FuncPtr func = reinterpret_cast<FuncPtr>(execMem);
+    int64_t result = func();
+    
+    // Cleanup
+    munmap(execMem, size);
+    
     return result;
 }
 
@@ -61,8 +93,8 @@ TEST_SUITE("Compiler - Basic Function Compilation") {
         
         CHECK(result.success);
         CHECK(result.ast != nullptr);
-        CHECK(result.code != nullptr);
         CHECK(result.codeSize > 0);
+        CHECK(!result.code.empty());
         CHECK(result.errorMessage.empty());
     }
     
@@ -72,8 +104,8 @@ TEST_SUITE("Compiler - Basic Function Compilation") {
         
         CHECK(result.success);
         CHECK(result.ast != nullptr);
-        CHECK(result.code != nullptr);
         CHECK(result.codeSize > 0);
+        CHECK(!result.code.empty());
     }
     
     TEST_CASE("Compile function with variable declaration") {
@@ -82,8 +114,8 @@ TEST_SUITE("Compiler - Basic Function Compilation") {
         
         CHECK(result.success);
         CHECK(result.ast != nullptr);
-        CHECK(result.code != nullptr);
         CHECK(result.codeSize > 0);
+        CHECK(!result.code.empty());
     }
     
     TEST_CASE("Compile function with binary operations") {
@@ -92,8 +124,8 @@ TEST_SUITE("Compiler - Basic Function Compilation") {
         
         CHECK(result.success);
         CHECK(result.ast != nullptr);
-        CHECK(result.code != nullptr);
         CHECK(result.codeSize > 0);
+        CHECK(!result.code.empty());
     }
 }
 
@@ -103,8 +135,8 @@ TEST_SUITE("Compiler - Comparison Operators") {
         auto result = compileGDScript(source);
         
         CHECK(result.success);
-        CHECK(result.code != nullptr);
         CHECK(result.codeSize > 0);
+        CHECK(!result.code.empty());
     }
     
     TEST_CASE("Compile inequality comparison") {
@@ -112,8 +144,8 @@ TEST_SUITE("Compiler - Comparison Operators") {
         auto result = compileGDScript(source);
         
         CHECK(result.success);
-        CHECK(result.code != nullptr);
         CHECK(result.codeSize > 0);
+        CHECK(!result.code.empty());
     }
     
     TEST_CASE("Compile less than comparison") {
@@ -121,8 +153,8 @@ TEST_SUITE("Compiler - Comparison Operators") {
         auto result = compileGDScript(source);
         
         CHECK(result.success);
-        CHECK(result.code != nullptr);
         CHECK(result.codeSize > 0);
+        CHECK(!result.code.empty());
     }
     
     TEST_CASE("Compile greater than comparison") {
@@ -130,8 +162,8 @@ TEST_SUITE("Compiler - Comparison Operators") {
         auto result = compileGDScript(source);
         
         CHECK(result.success);
-        CHECK(result.code != nullptr);
         CHECK(result.codeSize > 0);
+        CHECK(!result.code.empty());
     }
     
     TEST_CASE("Compile less than or equal comparison") {
@@ -139,8 +171,8 @@ TEST_SUITE("Compiler - Comparison Operators") {
         auto result = compileGDScript(source);
         
         CHECK(result.success);
-        CHECK(result.code != nullptr);
         CHECK(result.codeSize > 0);
+        CHECK(!result.code.empty());
     }
     
     TEST_CASE("Compile greater than or equal comparison") {
@@ -148,8 +180,8 @@ TEST_SUITE("Compiler - Comparison Operators") {
         auto result = compileGDScript(source);
         
         CHECK(result.success);
-        CHECK(result.code != nullptr);
         CHECK(result.codeSize > 0);
+        CHECK(!result.code.empty());
     }
 }
 
@@ -196,7 +228,7 @@ TEST_SUITE("Compiler - Function Registry Integration") {
         REQUIRE(execMem != nullptr);
         REQUIRE(execMem->is_valid());
         
-        execMem->copy(result.code, result.codeSize);
+        execMem->copy(result.get_code_ptr(), result.codeSize);
         void* funcAddr = execMem->get();
         
         // Register function
@@ -218,7 +250,7 @@ TEST_SUITE("Compiler - Function Registry Integration") {
         auto* execMem = memManager.allocate(result.codeSize);
         REQUIRE(execMem != nullptr);
         
-        execMem->copy(result.code, result.codeSize);
+        execMem->copy(result.get_code_ptr(), result.codeSize);
         void* funcAddr = execMem->get();
         
         // Call function
@@ -446,6 +478,78 @@ TEST_SUITE("Compiler - TDD: Unimplemented Features (Should Fail)") {
         // Currently will compile (no type checking)
         // Once type checking implemented, should fail with semantic error
         // CHECK_FALSE(result.success); // TDD: Expect failure once type checking added
+    }
+}
+
+TEST_SUITE("End-to-End Execution") {
+    TEST_CASE("Execute simple return constant") {
+        std::string source = "func test():\n    return 42\n";
+        auto result = compileGDScript(source);
+        
+        REQUIRE(result.success);
+        REQUIRE(result.codeSize > 0);
+        
+        // Execute and verify
+        int64_t actual = execute_generated_code(result.get_code_ptr(), result.codeSize);
+        CHECK(actual == 42);
+    }
+    
+    TEST_CASE("Execute simple addition") {
+        std::string source = "func add():\n    return 2 + 3\n";
+        auto result = compileGDScript(source);
+        
+        REQUIRE(result.success);
+        
+        // Execute and verify
+        int64_t actual = execute_generated_code(result.get_code_ptr(), result.codeSize);
+        CHECK(actual == 5);
+    }
+    
+    TEST_CASE("Execute with variable") {
+        std::string source = "func test():\n    var x = 10\n    return x\n";
+        auto result = compileGDScript(source);
+        
+        REQUIRE(result.success);
+        
+        // Execute and verify
+        int64_t actual = execute_generated_code(result.get_code_ptr(), result.codeSize);
+        CHECK(actual == 10);
+    }
+    
+    TEST_CASE("Execute binary operations") {
+        std::string source = "func calc():\n    return 2 * 3 + 4\n";
+        auto result = compileGDScript(source);
+        
+        REQUIRE(result.success);
+        
+        // Execute and verify (2 * 3 + 4 = 6 + 4 = 10)
+        // Note: Operator precedence may affect result
+        int64_t actual = execute_generated_code(result.get_code_ptr(), result.codeSize);
+        CHECK(actual == 10);
+    }
+    
+    TEST_CASE("Execute comparison operator") {
+        std::string source = "func test():\n    return 5 == 5\n";
+        auto result = compileGDScript(source);
+        
+        REQUIRE(result.success);
+        
+        // Execute and verify (should return 1 for true)
+        int64_t actual = execute_generated_code(result.get_code_ptr(), result.codeSize);
+        CHECK(actual == 1);
+    }
+    
+    TEST_CASE("Execute function with parameters") {
+        std::string source = "func add(a: int, b: int):\n    return a + b\n";
+        auto result = compileGDScript(source);
+        
+        REQUIRE(result.success);
+        
+        // Note: Parameters not yet supported in execution
+        // This test verifies compilation succeeds
+        // Execution test will be added once parameter passing is implemented
+        CHECK(result.codeSize > 0);
+        CHECK(!result.code.empty());
     }
 }
 

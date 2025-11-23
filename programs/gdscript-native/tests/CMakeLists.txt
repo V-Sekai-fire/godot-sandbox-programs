@@ -35,3 +35,25 @@ add_executable(test_dataset
     ../test_data_loader.cpp
 )
 
+# ELF generation test
+add_executable(test_elf_generation
+    ../test_elf_generation.cpp
+    ../parser/gdscript_parser.cpp
+    ../parser/errors.cpp
+    ../ast_to_riscv_biscuit.cpp
+    ../elf_generator.cpp
+    ../function_registry.cpp
+    ../code_memory_manager.cpp
+)
+
+# Set C++17 standard
+set_target_properties(test_elf_generation PROPERTIES
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED ON
+)
+
+# Add biscuit include for ELF generation test
+target_include_directories(test_elf_generation PRIVATE 
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../thirdparty/biscuit/include
+)
+

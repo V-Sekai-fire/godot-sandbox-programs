@@ -13,6 +13,7 @@ add_ci_program(gdscript_native
 	parser/errors.cpp
 	function_registry.cpp
 	code_memory_manager.cpp
+	elf_generator.cpp
 )
 
 # Add biscuit library (RISC-V assembler, similar to AsmJit)
