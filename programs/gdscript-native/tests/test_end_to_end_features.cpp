@@ -37,6 +37,15 @@ int64_t execute_via_elf(const std::vector<uint8_t>& code) {
         machine.setup_linux({"test_program"});
         machine.setup_linux_syscalls();
         
+        // Get entry point and ensure PC is set correctly
+        address_type<RISCV64> entry_point = machine.memory.start_address();
+        if (entry_point == 0) {
+            return -1;
+        }
+        
+        // Explicitly set PC to entry point (setup_linux may reset it)
+        machine.cpu.jump(entry_point);
+        
         // Set instruction limit
         machine.set_max_instructions(1'000'000);
         
