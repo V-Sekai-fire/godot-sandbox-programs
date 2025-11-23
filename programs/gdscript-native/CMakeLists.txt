@@ -29,3 +29,6 @@ set_target_properties(gdscript_native PROPERTIES
 
 # No linking needed - biscuit is header-only
 # (no MLIR/StableHLO, no external assembler library needed)
+
+# Add tests subdirectory
+add_subdirectory(tests)

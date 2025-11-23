@@ -1,0 +1,73 @@
+name: GDScript Compiler Tests
+
+on:
+  push:
+    branches: [ main, gdscript ]
+    paths:
+      - 'programs/gdscript-native/**'
+      - '.github/workflows/test-gdscript-compiler.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'programs/gdscript-native/**'
+      - '.github/workflows/test-gdscript-compiler.yml'
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Install dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y build-essential cmake git
+
+    - name: Build tests
+      working-directory: ${{github.workspace}}
+      run: |
+        cmake -B build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+        cmake --build build --target test_parser test_compiler test_dataset test_elf_generation --parallel 8
+
+    - name: Run parser tests
+      working-directory: ${{github.workspace}}/build
+      run: |
+        if [ -f programs/gdscript-native/tests/test_parser ]; then
+          ./programs/gdscript-native/tests/test_parser
+        else
+          echo "test_parser not found, skipping"
+        fi
+
+    - name: Run compiler tests
+      working-directory: ${{github.workspace}}/build
+      run: |
+        if [ -f programs/gdscript-native/tests/test_compiler ]; then
+          ./programs/gdscript-native/tests/test_compiler
+        else
+          echo "test_compiler not found, skipping"
+        fi
+
+    - name: Run dataset tests
+      working-directory: ${{github.workspace}}/build
+      run: |
+        if [ -f programs/gdscript-native/tests/test_dataset ]; then
+          ./programs/gdscript-native/tests/test_dataset
+        else
+          echo "test_dataset not found, skipping"
+        fi
+
+    - name: Run ELF generation tests
+      working-directory: ${{github.workspace}}/build
+      run: |
+        if [ -f programs/gdscript-native/tests/test_elf_generation ]; then
+          ./programs/gdscript-native/tests/test_elf_generation
+        else
+          echo "test_elf_generation not found, skipping"
+        fi
+
