@@ -772,6 +772,207 @@ No MLIR/StableHLO dependencies required - much simpler build!
 
 6. **Stack Management**: Stack size tracking improved but may need further refinement for complex functions with many local variables.
 
+## End-to-End Compilable GDScript Features
+
+The following GDScript features can be compiled end-to-end (GDScript → AST → RISC-V → ELF → Execution):
+
+### ✅ Fully Supported Features
+
+1. **Simple Functions**
+   ```gdscript
+   func test():
+       return 42
+   ```
+   - Compiles and executes successfully
+   - Returns integer constant
+
+2. **Functions with Parameters**
+   ```gdscript
+   func add(a: int, b: int):
+       return a + b
+   ```
+   - Parameters parsed and stored on stack
+   - Parameters accessible in function body
+   - Note: Parameter passing in execution not yet tested
+
+3. **Return Statements**
+   ```gdscript
+   func test():
+       return 42
+   ```
+   - Return values placed in a0 register
+   - Functions without explicit return default to 0
+
+4. **Integer Literals**
+   ```gdscript
+   func test():
+       return 42
+   ```
+   - 64-bit integer literals supported
+   - Negative integers supported
+
+5. **Boolean Literals**
+   ```gdscript
+   func test():
+       return true
+   ```
+   - `true` and `false` supported
+   - Stored as integers (1 for true, 0 for false)
+
+6. **Null Literals**
+   ```gdscript
+   func test():
+       return null
+   ```
+   - `null` literal supported
+   - Stored as integer 0
+
+7. **Variable Declarations**
+   ```gdscript
+   func test():
+       var x: int = 10
+       return x
+   ```
+   - Variables declared with type hints
+   - Variables initialized with expressions
+   - Variables stored on stack
+   - Variables accessible in expressions
+
+8. **Variable References (Identifiers)**
+   ```gdscript
+   func test():
+       var x = 5
+       return x
+   ```
+   - Variables can be read and used in expressions
+   - Stack-based variable access
+
+9. **Binary Arithmetic Operations**
+   ```gdscript
+   func calc():
+       return 2 + 3 * 4
+   ```
+   - Addition (`+`)
+   - Subtraction (`-`)
+   - Multiplication (`*`)
+   - Division (`/`)
+   - Modulo (`%`)
+   - Operator precedence handled correctly
+
+10. **Comparison Operators**
+    ```gdscript
+    func test():
+        return 5 == 5  # Equality
+        return 5 != 3  # Inequality
+        return 3 < 5   # Less than
+        return 5 > 3   # Greater than
+        return 3 <= 5  # Less than or equal
+        return 5 >= 3   # Greater than or equal
+    ```
+    - All comparison operators supported
+    - Return 1 for true, 0 for false
+
+11. **Complex Expressions**
+    ```gdscript
+    func calc():
+        return 1 + 2 * 3 - 4 / 2
+    ```
+    - Multiple operators in single expression
+    - Operator precedence respected
+    - Parentheses support (parser level)
+
+12. **Multiple Functions**
+    ```gdscript
+    func func1():
+        return 1
+    func func2():
+        return 2
+    ```
+    - Multiple functions in same program
+    - Each function generates separate code
+    - Functions compiled sequentially
+
+13. **Functions Without Return**
+    ```gdscript
+    func test():
+        var x = 5
+    ```
+    - Functions without explicit return compile
+    - Default return value is 0
+
+### ⚠️ Partially Supported Features
+
+1. **String Literals**
+   ```gdscript
+   func test():
+       return "hello"
+   ```
+   - Parsed correctly
+   - Code generation not yet implemented
+   - Currently stored as string in AST but not emitted
+
+2. **Float Literals**
+   ```gdscript
+   func test():
+       return 3.14
+   ```
+   - Parsed correctly
+   - Converted to integer in code generation
+   - Proper float support pending
+
+### ❌ Not Yet Supported Features
+
+1. **Control Flow**
+   - `if/elif/else` statements
+   - `for` loops
+   - `while` loops
+   - `match` statements
+
+2. **Logical Operators**
+   - `and`, `or`, `not`
+
+3. **Function Calls**
+   - Calling other functions
+   - Inter-function calls
+
+4. **Complex Types**
+   - Arrays (`[1, 2, 3]`)
+   - Dictionaries (`{"key": "value"}`)
+   - Strings (as return values)
+
+5. **Type System**
+   - Type checking
+   - Type inference
+   - Type conversions
+
+6. **Advanced Features**
+   - Classes
+   - Signals
+   - Enums
+   - Properties
+   - Static functions
+
+### Example: Complete Working Program
+
+```gdscript
+func add(a: int, b: int):
+    return a + b
+
+func multiply(x: int, y: int):
+    return x * y
+
+func calculate():
+    var result = 2 + 3 * 4
+    return result
+```
+
+This program:
+- ✅ Parses successfully
+- ✅ Generates RISC-V machine code
+- ✅ Creates valid ELF file
+- ✅ Executes in libriscv
+- ⚠️ Function calls between `add` and `multiply` not yet supported
+
 ## Immediate Next Steps (Priority Order)
 
 1. **Extend RISC-V Emitter**

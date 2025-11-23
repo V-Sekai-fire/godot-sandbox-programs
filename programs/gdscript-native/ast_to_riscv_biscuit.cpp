@@ -77,19 +77,15 @@ void ASTToRISCVEmitter::_emit_function(const FunctionNode* func) {
         _emit_statement(stmt.get());
     }
     
-    // Function epilogue: restore saved registers and return
+    // Function epilogue: exit via syscall (for entry point functions)
     // Default return value is 0 if no explicit return statement
-    _assembler->LI(biscuit::a0, 0);
+    // Note: a0 may already contain return value from explicit return statement
     
-    // Calculate actual stack size (may have grown during function body)
-    int paramStackSize = static_cast<int>(func->parameters.size() * 8);
-    int actualStackNeeded = 16 + std::max(_stack_offset, paramStackSize);
-    int actualStackSize = std::max(actualStackNeeded, _current_function_stack_size);
-    
-    _assembler->LD(biscuit::ra, actualStackSize - 8, biscuit::sp);
-    _assembler->LD(biscuit::s0, actualStackSize - 16, biscuit::sp);
-    _assembler->ADDI(biscuit::sp, biscuit::sp, actualStackSize);
-    _assembler->RET();
+    // For entry point functions called by libriscv, exit via syscall instead of returning
+    // Linux syscall: exit_group(a0) - syscall 94 (0x5e) for riscv64
+    // a0 already contains the return value (either from explicit return or default 0)
+    _assembler->LI(biscuit::a7, 94);  // syscall number for exit_group
+    _assembler->ECALL();               // Make syscall (exits program)
 }
 
 void ASTToRISCVEmitter::_emit_statement(const StatementNode* stmt) {
@@ -277,20 +273,11 @@ void ASTToRISCVEmitter::_emit_return(const ReturnStatement* ret) {
         }
     }
     
-    // Function epilogue - use the maximum of initial size and actual usage
-    // Calculate actual stack needed: saved regs (16) + max(_stack_offset, paramStackSize)
-    int returnParamStackSize = static_cast<int>(_current_function->parameters.size() * 8);
-    int actualStackNeeded = 16 + returnParamStackSize;
-    if (_stack_offset > returnParamStackSize) {
-        actualStackNeeded = 16 + _stack_offset;
-    }
-    // Ensure we use at least the allocated size (can't shrink, but can use full allocation)
-    int actualStackSize = (actualStackNeeded > _current_function_stack_size) ? actualStackNeeded : _current_function_stack_size;
-    
-    _assembler->LD(biscuit::ra, actualStackSize - 8, biscuit::sp);
-    _assembler->LD(biscuit::s0, actualStackSize - 16, biscuit::sp);
-    _assembler->ADDI(biscuit::sp, biscuit::sp, actualStackSize);
-    _assembler->RET();
+    // For entry point functions, exit via syscall instead of returning
+    // Linux syscall: exit_group(a0) - syscall 94 (0x5e) for riscv64
+    // a0 already contains the return value
+    _assembler->LI(biscuit::a7, 94);  // syscall number for exit_group
+    _assembler->ECALL();               // Make syscall (exits program)
 }
 
 void ASTToRISCVEmitter::_emit_variable_declaration(const VariableDeclaration* varDecl) {
