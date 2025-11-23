@@ -1,4 +1,5 @@
 #include "ast_to_riscv_biscuit.h"
+#include "riscv_code_templates.h"
 #include "constants.h"
 #include <cstring>
 
@@ -407,16 +408,16 @@ void ASTToRISCVEmitter::_emit_if_statement(const IfStatement* if_stmt) {
         _labels.push_back(std::move(else_label));
         _labels.push_back(std::move(end_label));
         
-        // Branch if condition is false (0) - jump to else/end
-        _assembler->BEQZ(cond_reg, else_ptr);
+        // Use code template for branch (like BeamAsm)
+        RISCVCodeTemplates::emit_branch_if_zero(_assembler.get(), cond_reg, else_ptr);
         
         // Emit then body
         for (const std::unique_ptr<StatementNode>& stmt : if_stmt->then_body) {
             _emit_statement(stmt.get());
         }
         
-        // Jump to end (skip else)
-        _assembler->JAL(end_ptr);
+        // Jump to end (skip else) using template
+        RISCVCodeTemplates::emit_jump(_assembler.get(), end_ptr);
         
         // Bind else label
         _assembler->Bind(else_ptr);
@@ -442,8 +443,8 @@ void ASTToRISCVEmitter::_emit_if_statement(const IfStatement* if_stmt) {
                 _emit_statement(stmt.get());
             }
             
-            // Jump to end
-            _assembler->JAL(elif_end_ptr);
+            // Jump to end using template
+            RISCVCodeTemplates::emit_jump(_assembler.get(), elif_end_ptr);
             
             // Bind elif else label
             _assembler->Bind(elif_else_ptr);
