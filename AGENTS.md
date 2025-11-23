@@ -18,6 +18,49 @@ GDScript Source Code
 
 **Note**: Following BEAM JIT pattern - no MLIR/StableHLO dependency. Direct code generation from AST to RISC-V 64 Linux machine code using **biscuit** (similar to how BEAM JIT uses AsmJit).
 
+### Architectural Decisions
+
+#### Why AST → RISC-V (Not Godot Bytecode → RISC-V)
+
+**Decision**: Use direct AST → RISC-V compilation, NOT Godot bytecode format.
+
+**Rationale**:
+- **BEAM JIT Pattern**: BEAM JIT generates machine code directly from BEAM instructions (not from AST, but still direct). Our approach generates directly from AST, which is even simpler.
+- **Performance**: Native code generation eliminates VM overhead. No interpretation layer needed.
+- **Simplicity**: Single translation step (AST → RISC-V) is simpler than two steps (GDScript → Bytecode → RISC-V).
+- **Independence**: No dependency on Godot's internal bytecode format, which:
+  - Contains non-serializable pointers
+  - May change between Godot versions
+  - Is designed for VM interpretation, not direct code generation
+  - Is not publicly documented/stable
+- **Control**: Full control over code generation allows for optimizations and RISC-V-specific improvements.
+
+**Alternative Considered**: Using Godot's bytecode format would require:
+- Reverse-engineering or depending on Godot internals
+- Translating stack-based bytecode to register-based RISC-V
+- Handling version compatibility issues
+- More complex architecture
+
+**Conclusion**: Direct AST → RISC-V compilation aligns with BEAM JIT philosophy of simplicity and direct code generation.
+
+#### Parser Choice (cpp-peglib)
+
+**Current**: Using cpp-peglib (PEG parser generator)
+
+**Status**: Working but has limitations:
+- Requires workarounds for Program rule semantic value storage
+- Fragile semantic value extraction (string-based type checking)
+- Limited error reporting capabilities
+
+**Future Consideration**: May switch to hand-written recursive descent parser for:
+- Better error messages
+- Direct AST construction (no std::any conversions)
+- Easier debugging
+- Full control over parsing logic
+- Better alignment with BEAM JIT simplicity philosophy
+
+**Decision**: Continue with cpp-peglib for now, but improve error handling and reduce workarounds. Re-evaluate if parser complexity grows significantly.
+
 ## Current Implementation Status
 
 ### ✅ Completed Components
@@ -177,21 +220,28 @@ No MLIR/StableHLO dependencies required - much simpler build!
 - [x] Create complete AST node hierarchy
 - [x] Define all GDScript language constructs (basic set)
 
-### Phase 3: Parser Implementation (Completed - Basic)
+### Phase 3: Parser Implementation (In Progress - Bug Fixes)
 - [x] Implement basic parser with cpp-peglib
 - [x] Basic grammar for functions, returns, literals, identifiers
 - [x] Variable declarations support
 - [x] Binary operations support
+- [x] Fix BinaryOp operator extraction (use semantic action)
+- [x] Complete variable declaration handling (type hints, initializers)
+- [ ] Improve return statement expression extraction
+- [ ] Implement error message retrieval from parser
 - [ ] Full GDScript grammar (control flow, types, indentation, etc.) - incremental work
 - [ ] Handle indentation-based blocks properly
 
-### Phase 4: AST to RISC-V Emitter (Completed - Basic)
+### Phase 4: AST to RISC-V Emitter (In Progress - Improvements)
 - [x] Implement direct AST to RISC-V 64 Linux assembly emitter
 - [x] Handwritten instruction templates (following BEAM JIT pattern)
 - [x] RISC-V 64 Linux ABI compliance
 - [x] Stack frame management
 - [x] Register allocation
 - [x] Support for: functions, returns, literals, identifiers, binary operations, variable declarations
+- [ ] Fix stack size calculation (track dynamic growth)
+- [ ] Improve register allocation (liveness tracking, cleanup)
+- [ ] Add comparison operators (==, !=, <, >, <=, >=)
 - [ ] Control flow support (if/else, loops)
 - [ ] Function calls
 - [ ] Full type system support
@@ -202,12 +252,19 @@ No MLIR/StableHLO dependencies required - much simpler build!
 - [x] AST building tests created and passing
 - [x] Test script for external RISC-V toolchain created
 - [x] Integration with main.cpp for end-to-end testing
+- [ ] Add AST structure validation to tests
+- [ ] Update test script to test compiler-generated code
 - [ ] Run external toolchain tests
 - [ ] Test with godot-dodo dataset samples
 
+### Phase 6: Documentation (In Progress)
+- [x] Document architectural decisions (AST → RISC-V, not bytecode)
+- [ ] Update README.md to reflect biscuit-based architecture
+- [ ] Consolidate status files (CURRENT_STATUS.md, IMPLEMENTATION_STATUS.md)
+
 ## Known Limitations
 
-1. **cpp-peglib Semantic Value Storage**: cpp-peglib doesn't store the Program rule's semantic value in the parse result (returns void). Workaround: store ProgramData in parser instance member variable `last_program_data` and retrieve it in `parse()` method. This is a documented workaround until we find a better approach or fix the root cause.
+1. **cpp-peglib Semantic Value Storage**: cpp-peglib doesn't store the Program rule's semantic value in the parse result (returns void). Workaround: store ProgramData in parser instance member variable `last_program_data` and retrieve it in `parse()` method. This is a documented workaround. **Future**: May switch to hand-written parser to eliminate this limitation.
 
 2. **Parser Grammar**: Basic grammar implemented and verified - supports functions, returns, literals, identifiers, variables, binary operations. Missing: control flow (if/else, loops), match statements, full type system, proper indentation handling.
 
@@ -263,6 +320,7 @@ No MLIR/StableHLO dependencies required - much simpler build!
 - Test with real godot-dodo dataset samples
 - Register allocation optimizations
 - Stack frame optimizations
+- **Parser**: Consider switching to hand-written recursive descent parser if cpp-peglib limitations become too burdensome
 
 ## Files Structure
 

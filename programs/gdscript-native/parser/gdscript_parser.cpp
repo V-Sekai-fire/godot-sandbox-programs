@@ -17,6 +17,13 @@ struct BinaryOpData {
     std::shared_ptr<ExpressionNode> right;
 };
 
+// Variable declaration data
+struct VarDeclData {
+    std::string name;
+    std::string typeHint;
+    std::any initializer; // Expression as any (shared_ptr<ExpressionNode> or BinaryOpData)
+};
+
 // Function data
 struct FunctionData {
     std::string name;
@@ -146,11 +153,17 @@ GDScriptParser::GDScriptParser() : last_program_data() {
         return std::any();
     };
     
+    // Binary operator - return operator string directly
+    (*p)["BinaryOp"] = [](const peg::SemanticValues& sv) -> std::any {
+        return sv.token_to_string();
+    };
+    
     // Binary expression: PrimaryExpr _ BinaryOp _ Expression
     // Store binary op info in a way that can be converted later
     (*p)["BinaryExpr"] = [](const peg::SemanticValues& sv) -> std::any {
         auto left = std::any_cast<std::shared_ptr<ExpressionNode>>(sv[0]);
-        std::string op = sv.token_to_string(1); // Get operator from BinaryOp rule
+        // BinaryOp is at sv[1] (after PrimaryExpr and whitespace)
+        std::string op = std::any_cast<std::string>(sv[1]);
         auto right = std::any_cast<std::shared_ptr<ExpressionNode>>(sv[2]);
         
         BinaryOpData data;
@@ -174,48 +187,59 @@ GDScriptParser::GDScriptParser() : last_program_data() {
     
     // Return statement
     // Grammar: 'return' _ Expression? _ NEWLINE
-    // The Expression is optional, so we need to find it in sv
-    // sv structure: [0] = 'return' token (empty), [1] = Expression (if present), [2] = NEWLINE (empty)
+    // The Expression is optional. If present, it will be the only non-empty semantic value
+    // (since 'return', whitespace, and NEWLINE don't produce semantic values)
     (*p)["ReturnStmt"] = [](const peg::SemanticValues& sv) -> std::any {
-        // Find the expression in sv (skip empty values)
-        std::any expr_any;
+        // Find the first non-empty value - it should be the expression if present
         for (size_t i = 0; i < sv.size(); ++i) {
             if (sv[i].has_value()) {
-                std::string type_name = sv[i].type().name();
-                
-                // Check if it's an expression type
-                // It could be std::shared_ptr<LiteralExpr>, std::shared_ptr<IdentifierExpr>, etc.
-                // or BinaryOpData, or std::shared_ptr<ExpressionNode>
-                // We'll try to cast it to see if it's an expression
-                try {
-                    // Try casting to shared_ptr<ExpressionNode> - this will work for any ExpressionNode subclass
-                    if (type_name.find("shared_ptr") != std::string::npos && 
-                        (type_name.find("LiteralExpr") != std::string::npos ||
-                         type_name.find("IdentifierExpr") != std::string::npos ||
-                         type_name.find("ExpressionNode") != std::string::npos)) {
-                        expr_any = sv[i];
-                        break;
-                    } else if (type_name.find("BinaryOpData") != std::string::npos) {
-                        expr_any = sv[i];
-                        break;
-                    }
-                } catch (...) {
-                    // Not an expression type, continue
-                }
+                // This is the expression (if return has a value) or empty (if return has no value)
+                // Return it directly - empty any means no return value
+                return sv[i];
             }
         }
-        return expr_any; // Return the expression, we'll wrap it in ReturnStatement in conversion
+        // No expression found - return empty any (means return with no value)
+        return std::any();
     };
     
     // Variable declaration statement
+    // Grammar: 'var' _ Identifier _ (':' _ TypeHint)? _ ('=' _ Expression)? _ NEWLINE
+    // Semantic values: [0] = Identifier (string), [1] = TypeHint (string, optional), [2] = Expression (optional)
     (*p)["VarDeclStmt"] = [](const peg::SemanticValues& sv) -> std::any {
-        auto stmt = std::make_shared<VariableDeclaration>();
-        stmt->name = std::any_cast<std::string>(sv[0]);
-        // TODO: Handle type hint and initializer
-        if (sv.size() > 1) {
-            // Type hint or initializer
+        VarDeclData data;
+        data.name = std::any_cast<std::string>(sv[0]);
+        
+        // Find type hint (if present) - it's a string that's not the identifier
+        for (size_t i = 1; i < sv.size(); ++i) {
+            if (sv[i].has_value() && sv[i].type() == typeid(std::string)) {
+                std::string str = std::any_cast<std::string>(sv[i]);
+                if (str != data.name) {
+                    data.typeHint = str;
+                    break;
+                }
+            }
         }
-        return stmt;
+        
+        // Find initializer expression (if present) - it's a shared_ptr<ExpressionNode> or BinaryOpData
+        for (size_t i = 1; i < sv.size(); ++i) {
+            if (sv[i].has_value()) {
+                std::string type_name = sv[i].type().name();
+                // Check if it's an expression type
+                if (type_name.find("shared_ptr") != std::string::npos && 
+                    (type_name.find("ExpressionNode") != std::string::npos ||
+                     type_name.find("LiteralExpr") != std::string::npos ||
+                     type_name.find("IdentifierExpr") != std::string::npos ||
+                     type_name.find("BinaryOpExpr") != std::string::npos)) {
+                    data.initializer = sv[i];
+                    break;
+                } else if (type_name.find("BinaryOpData") != std::string::npos) {
+                    data.initializer = sv[i];
+                    break;
+                }
+            }
+        }
+        
+        return data;
     };
     
     // Statement (dispatches to return/var/expression)
@@ -232,6 +256,21 @@ GDScriptParser::GDScriptParser() : last_program_data() {
             statements.push_back(sv[i]);
         }
         return statements;
+    };
+    
+    // Type hint - concatenate identifiers with dots
+    (*p)["TypeHint"] = [](const peg::SemanticValues& sv) -> std::any {
+        std::string result;
+        for (size_t i = 0; i < sv.size(); ++i) {
+            if (i > 0) result += ".";
+            result += std::any_cast<std::string>(sv[i]);
+        }
+        return result;
+    };
+    
+    // Return type - same as TypeHint
+    (*p)["ReturnType"] = [](const peg::SemanticValues& sv) -> std::any {
+        return sv[0]; // Pass through TypeHint
     };
     
     // Parameter
@@ -376,8 +415,7 @@ bool GDScriptParser::isValid() const {
 }
 
 std::string GDScriptParser::getErrorMessage() const {
-    // TODO: Implement error message retrieval from parser
-    return "";
+    return last_error_message;
 }
 
 // Helper to convert shared_ptr ExpressionNode or BinaryOpData to unique_ptr
@@ -459,7 +497,7 @@ std::unique_ptr<StatementNode> convertStatement(std::shared_ptr<StatementNode> s
         result->name = var->name;
         result->typeHint = var->typeHint;
         // var->initializer is unique_ptr in AST, but shared_ptr in semantic actions
-        // This shouldn't happen - VariableDeclaration should be created from expression any
+        // This shouldn't happen - VariableDeclaration should be created from VarDeclData
         // For now, skip initializer
         return result;
     }
@@ -467,18 +505,49 @@ std::unique_ptr<StatementNode> convertStatement(std::shared_ptr<StatementNode> s
     return nullptr;
 }
 
+// Helper to convert VarDeclData to unique_ptr VariableDeclaration
+std::unique_ptr<VariableDeclaration> convertVarDecl(const std::any& varDecl_any) {
+    if (!varDecl_any.has_value()) {
+        return nullptr;
+    }
+    
+    // Check if it's VarDeclData
+    if (varDecl_any.type() == typeid(VarDeclData)) {
+        auto data = std::any_cast<VarDeclData>(varDecl_any);
+        auto result = std::make_unique<VariableDeclaration>();
+        result->name = data.name;
+        result->typeHint = data.typeHint;
+        
+        // Convert initializer expression if present
+        if (data.initializer.has_value()) {
+            result->initializer = convertExpression(data.initializer);
+        }
+        
+        return result;
+    }
+    
+    return nullptr;
+}
+
 std::unique_ptr<ProgramNode> GDScriptParser::parse(const std::string& source) {
     if (!isValid()) {
+        last_error_message = "Parser initialization failed";
         return nullptr;
     }
     
     peg::parser* p = static_cast<peg::parser*>(parser);
+    
+    // Clear previous error
+    last_error_message.clear();
     
     // Parse with semantic actions
     std::any result;
     bool success = p->parse(source, result);
     
     if (!success) {
+        // Store a generic error message (cpp-peglib doesn't expose detailed error info easily)
+        // We could enhance this by using a custom log callback, but for now use a simple message
+        last_error_message = "Parse error: Failed to parse GDScript source code";
         return nullptr;
     }
     
@@ -500,9 +569,13 @@ std::unique_ptr<ProgramNode> GDScriptParser::parse(const std::string& source) {
             for (const auto& stmt_any : func_data.body) {
                 std::unique_ptr<StatementNode> stmt;
                 
+                // Check if it's VarDeclData
+                if (stmt_any.type() == typeid(VarDeclData)) {
+                    stmt = convertVarDecl(stmt_any);
+                }
                 // Check if it's a ReturnStmt (just expression any)
                 // ReturnStmt returns std::any (expression), so if it's not shared_ptr<StatementNode>, it's ReturnStmt
-                if (stmt_any.type() != typeid(std::shared_ptr<StatementNode>)) {
+                else if (stmt_any.type() != typeid(std::shared_ptr<StatementNode>)) {
                     // It's a ReturnStmt - create ReturnStatement with the expression
                     auto ret_stmt = std::make_unique<ReturnStatement>();
                     ret_stmt->value = convertExpression(stmt_any);
@@ -531,12 +604,20 @@ std::unique_ptr<ProgramNode> GDScriptParser::parse(const std::string& source) {
     // Convert top-level statements
     for (const auto& stmt_any : program_data.statements) {
         try {
-            if (stmt_any.type() == typeid(std::shared_ptr<StatementNode>)) {
+            std::unique_ptr<StatementNode> stmt;
+            
+            // Check if it's VarDeclData
+            if (stmt_any.type() == typeid(VarDeclData)) {
+                stmt = convertVarDecl(stmt_any);
+            }
+            // Check if it's a shared_ptr<StatementNode>
+            else if (stmt_any.type() == typeid(std::shared_ptr<StatementNode>)) {
                 auto shared_stmt = std::any_cast<std::shared_ptr<StatementNode>>(stmt_any);
-                auto stmt = convertStatement(shared_stmt);
-                if (stmt) {
-                    program->statements.push_back(std::move(stmt));
-                }
+                stmt = convertStatement(shared_stmt);
+            }
+            
+            if (stmt) {
+                program->statements.push_back(std::move(stmt));
             }
         } catch (...) {
             // Skip invalid statement

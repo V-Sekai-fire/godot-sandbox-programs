@@ -22,6 +22,9 @@ private:
     };
     ProgramData last_program_data;
     
+    // Store last error message for retrieval
+    mutable std::string last_error_message;
+    
     // Build AST from parse result
     std::unique_ptr<ProgramNode> buildAST(const void* parseResult);
     
