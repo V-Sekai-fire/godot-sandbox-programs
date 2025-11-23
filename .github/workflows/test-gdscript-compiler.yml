@@ -37,46 +37,60 @@ jobs:
       working-directory: ${{github.workspace}}
       run: |
         cmake -B build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+        if [ $? -ne 0 ]; then
+          echo "ERROR: CMake configuration failed"
+          exit 1
+        fi
         cmake --build build --target test_parser test_compiler test_dataset test_elf_generation --parallel 8
+        if [ $? -ne 0 ]; then
+          echo "ERROR: Test build failed"
+          exit 1
+        fi
+
+    - name: Verify test executables exist
+      working-directory: ${{github.workspace}}/build
+      run: |
+        echo "Checking for test executables..."
+        ls -la programs/gdscript-native/tests/ || echo "Tests directory not found"
+        find . -name "test_parser" -o -name "test_compiler" -o -name "test_dataset" -o -name "test_elf_generation" || echo "Test executables not found"
 
     - name: Run parser tests
       working-directory: ${{github.workspace}}/build
-      continue-on-error: true
       run: |
         if [ -f programs/gdscript-native/tests/test_parser ]; then
-          ./programs/gdscript-native/tests/test_parser || echo "Parser tests failed"
+          ./programs/gdscript-native/tests/test_parser
         else
-          echo "test_parser not found, skipping"
+          echo "ERROR: test_parser not found at programs/gdscript-native/tests/test_parser"
+          exit 1
         fi
 
     - name: Run compiler tests
       working-directory: ${{github.workspace}}/build
-      continue-on-error: true
       run: |
         if [ -f programs/gdscript-native/tests/test_compiler ]; then
-          ./programs/gdscript-native/tests/test_compiler || echo "Compiler tests failed"
+          ./programs/gdscript-native/tests/test_compiler
         else
-          echo "test_compiler not found, skipping"
+          echo "ERROR: test_compiler not found at programs/gdscript-native/tests/test_compiler"
+          exit 1
         fi
 
     - name: Run dataset tests
       working-directory: ${{github.workspace}}/build
-      continue-on-error: true
       run: |
         if [ -f programs/gdscript-native/tests/test_dataset ]; then
-          ./programs/gdscript-native/tests/test_dataset || echo "Dataset tests failed"
+          ./programs/gdscript-native/tests/test_dataset
         else
-          echo "test_dataset not found, skipping"
+          echo "ERROR: test_dataset not found at programs/gdscript-native/tests/test_dataset"
+          exit 1
         fi
 
     - name: Run ELF generation tests
       working-directory: ${{github.workspace}}/build
-      continue-on-error: true
       run: |
         if [ -f programs/gdscript-native/tests/test_elf_generation ]; then
           # test_elf_generation is a utility program, not a test - skip running it
           echo "test_elf_generation is a utility program, skipping test execution"
         else
-          echo "test_elf_generation not found, skipping"
+          echo "WARNING: test_elf_generation not found at programs/gdscript-native/tests/test_elf_generation"
         fi
 
