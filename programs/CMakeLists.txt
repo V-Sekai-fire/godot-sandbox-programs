@@ -26,8 +26,6 @@ if (NOT EMBEDDED_RISCV)
 	add_subdirectory(luajit)
 	add_subdirectory(mir)
 	add_subdirectory(robust_skin_weight_transfer)
-	# C# program (requires RISC-V .NET SDK)
-	add_subdirectory(csharp-hello)
 	# GDScript to RISC-V compiler
 	add_subdirectory(gdscript-native)
 endif()
