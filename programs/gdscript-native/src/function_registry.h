@@ -21,26 +21,33 @@ public:
     FunctionRegistry() = default;
     ~FunctionRegistry() = default;
     
-    // Register a compiled function
-    // name: Function name
-    // address: Pointer to executable memory
-    // size: Size of the code (for tracking)
+    /// \brief Register a compiled function
+    /// \param name Function name
+    /// \param address Pointer to executable memory containing the function
+    /// \param size Size of the code in bytes (for tracking)
     void register_function(const std::string& name, void* address, size_t size);
     
-    // Get function address by name
-    // Returns nullptr if not found
+    /// \brief Get function address by name
+    /// \param name Function name to look up
+    /// \return Pointer to executable memory, or nullptr if not found
     void* get_function(const std::string& name) const;
     
-    // Check if function is registered
+    /// \brief Check if function is registered
+    /// \param name Function name to check
+    /// \return True if function is registered, false otherwise
     bool has_function(const std::string& name) const;
     
-    // Get all registered function names
+    /// \brief Get all registered function names
+    /// \return Vector of all registered function names
     std::vector<std::string> get_function_names() const;
     
-    // Clear all registered functions (does not free memory)
+    /// \brief Clear all registered functions (does not free memory)
+    /// \note This only clears the registry, it does not free the executable memory
     void clear();
     
-    // Get function size
+    /// \brief Get function size in bytes
+    /// \param name Function name
+    /// \return Size in bytes, or 0 if function not found
     size_t get_function_size(const std::string& name) const;
 };
 

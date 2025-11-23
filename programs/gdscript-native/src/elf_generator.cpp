@@ -1,4 +1,5 @@
 #include "elf_generator.h"
+#include "constants.h"
 #include <cstring>
 #include <algorithm>
 
@@ -27,7 +28,7 @@ void ELFGenerator::clear() {
     _symbols.clear();
 }
 
-std::vector<uint8_t> ELFGenerator::generate() {
+std::vector<uint8_t> ELFGenerator::generate() const {
     if (_code_sections.empty()) {
         return {};
     }
@@ -43,17 +44,15 @@ std::vector<uint8_t> ELFGenerator::generate() {
     // But file size should match actual code size
     
     // ELF64 header and program header sizes
-    constexpr size_t ELF_HEADER_SIZE = 64;
-    constexpr size_t PROGRAM_HEADER_SIZE = 56;
-    constexpr size_t PAGE_ALIGN = 0x1000;
+    using namespace constants;
     
     size_t phdr_offset = ELF_HEADER_SIZE;
-    size_t code_offset_in_file = ELF_HEADER_SIZE + PROGRAM_HEADER_SIZE; // Code starts at offset 0x78
+    size_t code_offset_in_file = ELF_CODE_OFFSET;
     
-    // Program header: segment starts at file offset 0, loaded at virtual address 0x10000
+    // Program header: segment starts at file offset 0, loaded at virtual address ELF_ENTRY_POINT
     // Alignment requirement: p_offset % p_align == p_vaddr % p_align (both 0)
     size_t p_offset = 0x0;
-    uint64_t p_vaddr = ELF_ENTRY_POINT;
+    uint64_t p_vaddr = constants::ELF_ENTRY_POINT;
     
     // Section headers: null (0) + .text (1) + .shstrtab (2)
     constexpr size_t SECTION_HEADER_SIZE = 64;
@@ -62,7 +61,7 @@ std::vector<uint8_t> ELFGenerator::generate() {
     
     // Calculate segment size: align to page boundary (includes headers + code)
     size_t segment_size = code_offset_in_file + code_size;
-    segment_size = ((segment_size + PAGE_ALIGN - 1) / PAGE_ALIGN) * PAGE_ALIGN;
+    segment_size = ((segment_size + PAGE_SIZE - 1) / PAGE_SIZE) * PAGE_SIZE;
     
     // .text section virtual address: maintains relationship sh_addr - p_vaddr == sh_offset - p_offset
     // This ensures libriscv's serialize_execute_segment() places code correctly
@@ -101,7 +100,7 @@ std::vector<uint8_t> ELFGenerator::generate() {
     return elf;
 }
 
-void ELFGenerator::_write_elf_header(std::vector<uint8_t>& elf, size_t& offset, size_t shdr_offset, size_t num_sections, uint64_t entry_point) {
+void ELFGenerator::_write_elf_header(std::vector<uint8_t>& elf, size_t& offset, size_t shdr_offset, size_t num_sections, uint64_t entry_point) const {
     // ELF magic
     std::memcpy(elf.data() + offset, ELF_MAGIC, 4);
     offset += 4;
@@ -177,7 +176,7 @@ void ELFGenerator::_write_elf_header(std::vector<uint8_t>& elf, size_t& offset, 
     offset += 2;
 }
 
-void ELFGenerator::_write_program_headers(std::vector<uint8_t>& elf, size_t& offset, size_t p_filesz, size_t p_memsz, size_t p_offset, uint64_t p_vaddr) {
+void ELFGenerator::_write_program_headers(std::vector<uint8_t>& elf, size_t& offset, size_t p_filesz, size_t p_memsz, size_t p_offset, uint64_t p_vaddr) const {
     // PT_LOAD program header
     // p_type = PT_LOAD (1)
     *reinterpret_cast<uint32_t*>(elf.data() + offset) = 1;
@@ -198,11 +197,11 @@ void ELFGenerator::_write_program_headers(std::vector<uint8_t>& elf, size_t& off
     offset += 8;
     *reinterpret_cast<uint64_t*>(elf.data() + offset) = p_memsz;  // Memory size (code only)
     offset += 8;
-    *reinterpret_cast<uint64_t*>(elf.data() + offset) = 0x1000;   // Alignment (4KB page)
+    *reinterpret_cast<uint64_t*>(elf.data() + offset) = constants::PAGE_SIZE;   // Alignment (4KB page)
     offset += 8;
 }
 
-void ELFGenerator::_write_section_headers(std::vector<uint8_t>& elf, size_t shdr_offset, size_t code_offset, size_t code_size, size_t shstrtab_offset, size_t shstrtab_size, uint64_t text_vaddr) {
+void ELFGenerator::_write_section_headers(std::vector<uint8_t>& elf, size_t shdr_offset, size_t code_offset, size_t code_size, size_t shstrtab_offset, size_t shstrtab_size, uint64_t text_vaddr) const {
     size_t offset = shdr_offset;
     
     // Section 0: NULL section header
@@ -272,12 +271,12 @@ void ELFGenerator::_write_section_headers(std::vector<uint8_t>& elf, size_t shdr
     offset += 8;
 }
 
-void ELFGenerator::_write_symbol_table(std::vector<uint8_t>& elf, size_t& offset) {
+void ELFGenerator::_write_symbol_table(std::vector<uint8_t>& elf, size_t& offset) const {
     // Not implemented - minimal ELF doesn't need symbol table
     // Symbols would be added via section headers
 }
 
-void ELFGenerator::_write_string_table(std::vector<uint8_t>& elf, size_t offset) {
+void ELFGenerator::_write_string_table(std::vector<uint8_t>& elf, size_t offset) const {
     // Write .shstrtab: "\0.text\0.shstrtab\0"
     const char* strtab = "\0.text\0.shstrtab\0";
     std::memcpy(elf.data() + offset, strtab, 16);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "parser/ast.h"
+#include "constants.h"
 #include <biscuit/assembler.hpp>
 #include <vector>
 #include <unordered_map>
@@ -65,27 +66,30 @@ private:
     void _reset_function_state();
     
 public:
-    ASTToRISCVEmitter() : _stack_offset(0), _current_function_stack_size(16), 
+    ASTToRISCVEmitter() : _stack_offset(0), _current_function_stack_size(constants::SAVED_REGISTERS_SIZE), 
                           _label_counter(0), _temp_reg_index(0), _current_function(nullptr),
                           _current_epilogue_label(nullptr) {
-        _code_buffer.resize(8192); // Initial buffer size (will grow if needed)
+        _code_buffer.resize(constants::INITIAL_CODE_BUFFER_SIZE); // Initial buffer size (will grow if needed)
     }
     
-    // Main entry point: emit RISC-V machine code from AST
-    // Returns pointer to machine code and size
+    /// \brief Main entry point: emit RISC-V machine code from AST
+    /// \param program The root AST node containing functions to compile
+    /// \return Pair of (code pointer, code size). Pointer is valid until clear() is called.
+    /// \note The returned pointer points into internal buffer. Do not free it.
     std::pair<const uint8_t*, size_t> emit(const ProgramNode* program);
     
-    // Get the generated machine code
+    /// \brief Get the generated machine code buffer
+    /// \return Const reference to the internal code buffer
     const std::vector<uint8_t>& get_code() const { return _code_buffer; }
     
     // Clear state
     void clear() {
         _code_buffer.clear();
-        _code_buffer.resize(8192);
+        _code_buffer.resize(constants::INITIAL_CODE_BUFFER_SIZE);
         _expr_to_reg.clear();
         _var_to_stack_offset.clear();
         _stack_offset = 0;
-        _current_function_stack_size = 16;
+        _current_function_stack_size = constants::SAVED_REGISTERS_SIZE;
         _label_counter = 0;
         _temp_reg_index = 0;
         _current_function = nullptr;

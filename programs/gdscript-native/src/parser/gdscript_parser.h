@@ -54,6 +54,11 @@ private:
     // Helper to build AST nodes
     std::unique_ptr<LiteralExpr> make_literal(const Token& token);
     std::unique_ptr<IdentifierExpr> make_identifier(const Token& token);
+    
+    // Number parsing helpers (private)
+    bool parse_integer(const std::string& str, int64_t& out);
+    bool parse_float(const std::string& str, double& out);
+    bool is_valid_number(const std::string& str, bool& is_float);
 
 public:
     GDScriptParser();

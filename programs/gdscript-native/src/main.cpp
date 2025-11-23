@@ -33,8 +33,16 @@ static Variant compile_gdscript(String gdscript_code) {
 	std::unique_ptr<gdscript::ProgramNode> ast = parser.parse(source);
 	
 	if (!ast) {
-		print("Error: Failed to parse GDScript code\n");
-		print("Error message: ", parser.getErrorMessage().c_str(), "\n");
+		// Use structured error reporting
+		const gdscript::ErrorCollection& errors = parser.get_errors();
+		if (errors.has_errors()) {
+			std::string error_msg = errors.get_formatted_message();
+			print("Error: Failed to parse GDScript code\n");
+			print("Error details: ", error_msg.c_str(), "\n");
+		} else {
+			print("Error: Failed to parse GDScript code\n");
+			print("Error message: ", parser.getErrorMessage().c_str(), "\n");
+		}
 		return Nil;
 	}
 	
@@ -60,9 +68,9 @@ static Variant compile_gdscript(String gdscript_code) {
 	elf_gen.add_code_section(machineCode, codeSize, ".text");
 	
 	// Add function symbols for sandbox to discover
-	// Functions are at entry point (0x10000) for now
+	// Functions are at entry point for now
 	// TODO: Calculate actual function addresses when we support multiple functions
-	uint64_t func_address = 0x10000;
+	uint64_t func_address = gdscript::constants::ELF_ENTRY_POINT;
 	for (const std::unique_ptr<gdscript::FunctionNode>& func : ast->functions) {
 		std::string funcName = func->name;
 		if (funcName.empty()) {

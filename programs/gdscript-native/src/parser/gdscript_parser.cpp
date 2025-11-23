@@ -358,6 +358,40 @@ std::unique_ptr<ExpressionNode> GDScriptParser::parse_primary() {
     return nullptr;
 }
 
+bool GDScriptParser::is_valid_number(const std::string& str, bool& is_float) {
+    is_float = str.find('.') != std::string::npos;
+    
+    for (size_t i = 0; i < str.length(); ++i) {
+        char c = str[i];
+        if (i == 0 && c == '-') continue; // Allow negative sign
+        if (c == '.' && is_float) continue; // Allow decimal point
+        if (c < '0' || c > '9') {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool GDScriptParser::parse_integer(const std::string& str, int64_t& out) {
+    char* end = nullptr;
+    int64_t val = std::strtoll(str.c_str(), &end, 10);
+    if (end != str.c_str() && *end == '\0') {
+        out = val;
+        return true;
+    }
+    return false;
+}
+
+bool GDScriptParser::parse_float(const std::string& str, double& out) {
+    char* end = nullptr;
+    double val = std::strtod(str.c_str(), &end);
+    if (end != str.c_str() && *end == '\0') {
+        out = val;
+        return true;
+    }
+    return false;
+}
+
 std::unique_ptr<LiteralExpr> GDScriptParser::make_literal(const Token& token) {
     std::unique_ptr<LiteralExpr> lit = std::make_unique<LiteralExpr>();
         
@@ -368,50 +402,37 @@ std::unique_ptr<LiteralExpr> GDScriptParser::make_literal(const Token& token) {
         lit->value = false;
     } else if (token.literal == "null") {
         lit->value = nullptr;
-            } else {
+    } else {
         // Try to parse as number (without exceptions)
-        bool is_float = token.literal.find('.') != std::string::npos;
-        bool is_number = true;
-        
-        // Check if it's a valid number
-        for (size_t i = 0; i < token.literal.length(); ++i) {
-            char c = token.literal[i];
-            if (i == 0 && c == '-') continue; // Allow negative sign
-            if (c == '.' && is_float) continue; // Allow decimal point
-            if (c < '0' || c > '9') {
-                is_number = false;
-                break;
-            }
-        }
+        bool is_float = false;
+        bool is_number = is_valid_number(token.literal, is_float);
         
         if (is_number) {
             if (is_float) {
-                char* end = nullptr;
-                double val = std::strtod(token.literal.c_str(), &end);
-                if (end != token.literal.c_str() && *end == '\0') {
+                double val;
+                if (parse_float(token.literal, val)) {
                     lit->value = val;
-            } else {
+                } else {
                     // String literal (parsing failed)
                     lit->value = token.literal;
                 }
             } else {
-                char* end = nullptr;
-                int64_t val = std::strtoll(token.literal.c_str(), &end, 10);
-                if (end != token.literal.c_str() && *end == '\0') {
+                int64_t val;
+                if (parse_integer(token.literal, val)) {
                     lit->value = val;
-            } else {
+                } else {
                     // String literal (parsing failed)
                     lit->value = token.literal;
                 }
             }
-                } else {
+        } else {
             // String literal (already has quotes stripped)
             lit->value = token.literal;
         }
     }
     
     return lit;
-    }
+}
     
 std::unique_ptr<IdentifierExpr> GDScriptParser::make_identifier(const Token& token) {
     std::unique_ptr<IdentifierExpr> ident = std::make_unique<IdentifierExpr>();

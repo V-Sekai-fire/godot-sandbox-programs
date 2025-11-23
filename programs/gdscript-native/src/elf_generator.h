@@ -11,16 +11,24 @@ namespace gdscript {
 // Creates minimal ELF executable with code and symbols
 class ELFGenerator {
 public:
-    // Add a code section with machine code
+    /// \brief Add a code section with machine code
+    /// \param code Pointer to machine code bytes
+    /// \param size Size of code in bytes
+    /// \param name Section name (default: ".text")
     void add_code_section(const uint8_t* code, size_t size, const std::string& name = ".text");
     
-    // Add a function symbol (for sandbox to discover)
+    /// \brief Add a function symbol (for sandbox to discover)
+    /// \param name Function name
+    /// \param address Virtual address of function
+    /// \param size Size of function code in bytes
     void add_symbol(const std::string& name, uint64_t address, size_t size);
     
-    // Generate ELF file and return as byte array
-    std::vector<uint8_t> generate();
+    /// \brief Generate ELF file and return as byte array
+    /// \return Vector containing ELF file bytes, or empty vector on failure
+    /// \note This method does not modify internal state (could be const but returns new data)
+    std::vector<uint8_t> generate() const;
     
-    // Clear all sections and symbols
+    /// \brief Clear all sections and symbols
     void clear();
 
 private:
@@ -46,22 +54,22 @@ private:
     static constexpr uint8_t ELF_VERSION = 1;
     static constexpr uint16_t ELF_TYPE_EXEC = 2;
     static constexpr uint16_t ELF_MACHINE_RISCV = 243;
-    static constexpr uint64_t ELF_ENTRY_POINT = 0x10000;
+    // ELF_ENTRY_POINT moved to constants.h
     
     // Write ELF header
-    void _write_elf_header(std::vector<uint8_t>& elf, size_t& offset, size_t shdr_offset, size_t num_sections, uint64_t entry_point);
+    void _write_elf_header(std::vector<uint8_t>& elf, size_t& offset, size_t shdr_offset, size_t num_sections, uint64_t entry_point) const;
     
     // Write program headers
-    void _write_program_headers(std::vector<uint8_t>& elf, size_t& offset, size_t p_filesz, size_t p_memsz, size_t p_offset, uint64_t p_vaddr);
+    void _write_program_headers(std::vector<uint8_t>& elf, size_t& offset, size_t p_filesz, size_t p_memsz, size_t p_offset, uint64_t p_vaddr) const;
     
     // Write section headers
-    void _write_section_headers(std::vector<uint8_t>& elf, size_t shdr_offset, size_t code_offset, size_t code_size, size_t shstrtab_offset, size_t shstrtab_size, uint64_t text_vaddr);
+    void _write_section_headers(std::vector<uint8_t>& elf, size_t shdr_offset, size_t code_offset, size_t code_size, size_t shstrtab_offset, size_t shstrtab_size, uint64_t text_vaddr) const;
     
     // Write symbol table
-    void _write_symbol_table(std::vector<uint8_t>& elf, size_t& offset);
+    void _write_symbol_table(std::vector<uint8_t>& elf, size_t& offset) const;
     
     // Write string table
-    void _write_string_table(std::vector<uint8_t>& elf, size_t offset);
+    void _write_string_table(std::vector<uint8_t>& elf, size_t offset) const;
 };
 
 } // namespace gdscript

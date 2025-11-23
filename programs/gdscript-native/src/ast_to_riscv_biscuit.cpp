@@ -1,4 +1,5 @@
 #include "ast_to_riscv_biscuit.h"
+#include "constants.h"
 #include <cstring>
 
 namespace gdscript {
@@ -18,8 +19,9 @@ std::pair<const uint8_t*, size_t> ASTToRISCVEmitter::emit(const ProgramNode* pro
         _emit_function(func.get());
         
         // Check buffer capacity (grow if >90% full)
+        using namespace constants;
         size_t currentOffset = static_cast<size_t>(_assembler->GetCodeBuffer().GetCursorOffset());
-        if (currentOffset >= _code_buffer.size() * 0.9) {
+        if (currentOffset >= _code_buffer.size() * BUFFER_GROWTH_THRESHOLD) {
             // Buffer growth requires recreating assembler, so we allocate large initial buffer
             // TODO: Implement proper buffer growth strategy if needed
         }
@@ -45,9 +47,10 @@ void ASTToRISCVEmitter::_emit_function(const FunctionNode* func) {
     // - sp+0: saved frame pointer (s0/fp)
     // - sp+8: saved return address (ra)
     // - sp+16+: parameters and local variables
-    int paramStackSize = static_cast<int>(func->parameters.size() * 8);
-    int initialStackSize = 16 + paramStackSize;  // Saved regs + parameters
-    int estimatedLocalVars = 64;                 // Conservative estimate for locals
+    using namespace constants;
+    int paramStackSize = static_cast<int>(func->parameters.size() * BYTES_PER_PARAMETER);
+    int initialStackSize = SAVED_REGISTERS_SIZE + paramStackSize;  // Saved regs + parameters
+    int estimatedLocalVars = ESTIMATED_LOCAL_VARS_SIZE;            // Conservative estimate for locals
     int stackSize = initialStackSize + estimatedLocalVars;
     _current_function_stack_size = stackSize;
     
@@ -64,8 +67,8 @@ void ASTToRISCVEmitter::_emit_function(const FunctionNode* func) {
         biscuit::a4, biscuit::a5, biscuit::a6, biscuit::a7
     };
     
-    for (size_t i = 0; i < func->parameters.size() && i < 8; ++i) {
-        int offset = 16 + static_cast<int>(i * 8); // After saved registers
+    for (size_t i = 0; i < func->parameters.size() && i < MAX_ARGUMENT_REGISTERS; ++i) {
+        int offset = SAVED_REGISTERS_SIZE + static_cast<int>(i * BYTES_PER_PARAMETER); // After saved registers
         _assembler->SD(argRegs[i], offset, biscuit::sp);
         _var_to_stack_offset[func->parameters[i].first] = offset;
     }
