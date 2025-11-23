@@ -175,7 +175,7 @@ void GDScriptParser::parse_suite(const std::string& context, std::vector<std::un
         // Check for dedent (end of block)
         if (multiline && check(TokenType::DEDENT)) {
             advance();
-                break;
+                    break;
             }
         
         if (is_at_end()) break;
@@ -611,7 +611,7 @@ std::unique_ptr<LiteralExpr> GDScriptParser::make_literal(const Token& token) {
                     lit->value = token.literal;
                 }
             }
-        } else {
+                } else {
             // String literal (already has quotes stripped)
             lit->value = token.literal;
         }

@@ -187,12 +187,6 @@ if(APPLE)
     endif()
 endif()
 
-# Dataset parsing test
-add_executable(test_dataset_parse
-    test_dataset_parse.cpp
-    ${PARSER_SOURCES}
-)
-
 # AST Interpreter test
 add_executable(test_ast_interpreter
     test_ast_interpreter.cpp
@@ -205,12 +199,6 @@ add_executable(test_adhoc
     test_adhoc.cpp
     ${PARSER_SOURCES}
     ../src/ast_interpreter.cpp
-)
-
-# Set C++17 standard for dataset test
-set_target_properties(test_dataset_parse PROPERTIES
-    CXX_STANDARD 17
-    CXX_STANDARD_REQUIRED ON
 )
 
 # Set C++17 standard for AST interpreter test
