@@ -1,10 +1,10 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
-#include "../parser/gdscript_parser.h"
-#include "../ast_to_riscv_biscuit.h"
-#include "../elf_generator.h"
-#include "../function_registry.h"
-#include "../code_memory_manager.h"
+#include "../src/parser/gdscript_parser.h"
+#include "../src/ast_to_riscv_biscuit.h"
+#include "../src/elf_generator.h"
+#include "../src/function_registry.h"
+#include "../src/code_memory_manager.h"
 #include <libriscv/machine.hpp>
 #include <string>
 #include <memory>

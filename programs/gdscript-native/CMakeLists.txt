@@ -6,14 +6,13 @@ project(gdscript-native)
 
 # Build the gdscript-native sandbox program
 add_ci_program(gdscript_native
-	main.cpp
-	ast_to_riscv_biscuit.cpp
-	test_data_loader.cpp
-	parser/gdscript_parser.cpp
-	parser/errors.cpp
-	function_registry.cpp
-	code_memory_manager.cpp
-	elf_generator.cpp
+	src/main.cpp
+	src/ast_to_riscv_biscuit.cpp
+	src/parser/gdscript_parser.cpp
+	src/parser/errors.cpp
+	src/function_registry.cpp
+	src/code_memory_manager.cpp
+	src/elf_generator.cpp
 )
 
 # Add biscuit library (RISC-V assembler, similar to AsmJit)

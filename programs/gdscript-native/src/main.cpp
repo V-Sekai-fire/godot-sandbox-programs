@@ -6,7 +6,7 @@
 
 // Direct AST to RISC-V emitter using biscuit (following BEAM JIT pattern)
 #include "ast_to_riscv_biscuit.h"
-#include "test_data_loader.h"
+// #include "test_data_loader.h"  // TODO: Add test_data_loader files
 #include "parser/gdscript_parser.h"
 #include "function_registry.h"
 #include "code_memory_manager.h"
@@ -108,68 +108,17 @@ static Variant test_compile() {
 }
 
 // Load and test with dataset entries
+// TODO: Re-enable when test_data_loader is added
 static Variant test_dataset(int count) {
-	print("Loading GDScript dataset...\n");
-	
-	gdscript::TestDataLoader loader;
-	std::string datasetPath = "test_data/data/godot_dodo_4x_60k/godot_dodo_4x_60k_data.json";
-	
-	if (!loader.loadDataset(datasetPath)) {
-		print("Error: Failed to load dataset from: ", datasetPath.c_str(), "\n");
-		return Nil;
-	}
-	
-	print("Loaded ", loader.getEntryCount(), " entries from dataset\n");
-	
-	// Get a subset of entries to test
-	size_t testCount = (count > 0 && count < 100) ? count : 10;
-	auto testEntries = loader.getSubset(testCount);
-	
-	print("Testing compilation with ", testEntries.size(), " entries...\n");
-	
-	int successCount = 0;
-	int failCount = 0;
-	
-	for (size_t i = 0; i < testEntries.size(); ++i) {
-		const auto* entry = testEntries[i];
-		if (!entry) continue;
-		
-		print("Test ", (i + 1), "/", testEntries.size(), ": ", entry->instruction.c_str(), "\n");
-		
-		// Try to compile the GDScript code
-		String gdscriptCode = String(entry->gdscript_code.c_str());
-		Variant callable = compile_gdscript(gdscriptCode);
-		
-		if (callable.get_type() == Variant::Type::CALLABLE) {
-			successCount++;
-			print("  ✓ Compilation successful\n");
-		} else {
-			failCount++;
-			print("  ✗ Compilation failed\n");
-		}
-	}
-	
-	print("Results: ", successCount, " successful, ", failCount, " failed\n");
-	
-	return successCount;
+	print("Error: test_data_loader not available\n");
+	return Nil;
 }
 
 // Get a random entry from the dataset
+// TODO: Re-enable when test_data_loader is added
 static Variant get_random_test() {
-	gdscript::TestDataLoader loader;
-	std::string datasetPath = "test_data/data/godot_dodo_4x_60k/godot_dodo_4x_60k_data.json";
-	
-	if (!loader.loadDataset(datasetPath)) {
-		return Nil;
-	}
-	
-	const auto* entry = loader.getRandomEntry();
-	if (!entry) {
-		return Nil;
-	}
-	
-	// Return the GDScript code as a string
-	return String(entry->gdscript_code.c_str());
+	print("Error: test_data_loader not available\n");
+	return Nil;
 }
 
 int main() {

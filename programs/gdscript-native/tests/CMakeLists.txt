@@ -4,14 +4,15 @@ project(gdscript-native-tests)
 # Add doctest include directory
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
-# Add parser include directory
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/..)
+# Add source include directories
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../src)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../src/parser)
 
 # Test executable for parser tests
 add_executable(test_parser
     test_parser.cpp
-    ../parser/gdscript_parser.cpp
-    ../parser/errors.cpp
+    ../src/parser/gdscript_parser.cpp
+    ../src/parser/errors.cpp
 )
 
 # Set C++17 standard (required for std::variant and std::any)
@@ -23,11 +24,11 @@ set_target_properties(test_parser PROPERTIES
 # Test executable for compiler tests (TDD style)
 add_executable(test_compiler
     test_compiler.cpp
-    ../parser/gdscript_parser.cpp
-    ../parser/errors.cpp
-    ../ast_to_riscv_biscuit.cpp
-    ../function_registry.cpp
-    ../code_memory_manager.cpp
+    ../src/parser/gdscript_parser.cpp
+    ../src/parser/errors.cpp
+    ../src/ast_to_riscv_biscuit.cpp
+    ../src/function_registry.cpp
+    ../src/code_memory_manager.cpp
     # Add biscuit source files for linking
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../ext/biscuit/src/assembler.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../ext/biscuit/src/assembler_compressed.cpp
@@ -52,9 +53,8 @@ set_target_properties(test_compiler PROPERTIES
 # Dataset tests
 add_executable(test_dataset
     test_dataset.cpp
-    ../parser/gdscript_parser.cpp
-    ../parser/errors.cpp
-    ../test_data_loader.cpp
+    ../src/parser/gdscript_parser.cpp
+    ../src/parser/errors.cpp
 )
 
 # Set C++17 standard (required for std::variant and std::any)
@@ -63,35 +63,12 @@ set_target_properties(test_dataset PROPERTIES
     CXX_STANDARD_REQUIRED ON
 )
 
-# ELF generation test
-add_executable(test_elf_generation
-    ../test_elf_generation.cpp
-    ../parser/gdscript_parser.cpp
-    ../parser/errors.cpp
-    ../ast_to_riscv_biscuit.cpp
-    ../elf_generator.cpp
-    ../function_registry.cpp
-    ../code_memory_manager.cpp
-    # Add biscuit source files for linking
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../ext/biscuit/src/assembler.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../ext/biscuit/src/assembler_compressed.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../ext/biscuit/src/assembler_crypto.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../ext/biscuit/src/assembler_floating_point.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../ext/biscuit/src/assembler_vector.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../ext/biscuit/src/code_buffer.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../ext/biscuit/src/cpuinfo.cpp
-)
-
-# Set C++20 standard (required for biscuit library)
-set_target_properties(test_elf_generation PROPERTIES
-    CXX_STANDARD 20
-    CXX_STANDARD_REQUIRED ON
-)
-
-# Add biscuit include for ELF generation test
-target_include_directories(test_elf_generation PRIVATE 
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../ext/biscuit/include
-)
+# ELF generation test - disabled (source file doesn't exist)
+# test_elf_generation is a utility program, not a test
+# add_executable(test_elf_generation
+#     ../test_elf_generation.cpp
+#     ...
+# )
 
 # Note: biscuit is header-only for our use case
 # If linking errors occur, we may need to add biscuit source files
@@ -99,12 +76,12 @@ target_include_directories(test_elf_generation PRIVATE
 # End-to-end features test
 add_executable(test_end_to_end_features
     test_end_to_end_features.cpp
-    ../parser/gdscript_parser.cpp
-    ../parser/errors.cpp
-    ../ast_to_riscv_biscuit.cpp
-    ../elf_generator.cpp
-    ../function_registry.cpp
-    ../code_memory_manager.cpp
+    ../src/parser/gdscript_parser.cpp
+    ../src/parser/errors.cpp
+    ../src/ast_to_riscv_biscuit.cpp
+    ../src/elf_generator.cpp
+    ../src/function_registry.cpp
+    ../src/code_memory_manager.cpp
     # Add biscuit source files for linking
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../ext/biscuit/src/assembler.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../ext/biscuit/src/assembler_compressed.cpp

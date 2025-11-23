@@ -1,8 +1,8 @@
 // Adhoc manual testing script
 // Compile with: g++ -std=c++17 -I.. -I../parser test_adhoc.cpp ../parser/gdscript_parser.cpp -o test_adhoc
 
-#include "../parser/gdscript_parser.h"
-#include "../parser/ast.h"
+#include "../src/parser/gdscript_parser.h"
+#include "../src/parser/ast.h"
 #include <iostream>
 #include <string>
 

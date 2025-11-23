@@ -1,6 +1,6 @@
 // Test AST building with various GDScript constructs
-#include "../parser/gdscript_parser.h"
-#include "../parser/ast.h"
+#include "../src/parser/gdscript_parser.h"
+#include "../src/parser/ast.h"
 #include <iostream>
 #include <string>
 #include <cassert>
