@@ -19,7 +19,22 @@ int main(int argc, char* argv[]) {
     std::string gdscript_code;
     
     if (argc >= 3) {
-        gdscript_code = argv[2];
+        std::string arg = argv[2];
+        // Try to read as file first
+        std::ifstream file(arg);
+        if (file.good()) {
+            gdscript_code.assign((std::istreambuf_iterator<char>(file)),
+                                 std::istreambuf_iterator<char>());
+            file.close();
+        } else {
+            // Use as code string, replace literal \n with actual newlines
+            gdscript_code = arg;
+            std::string::size_type pos = 0;
+            while ((pos = gdscript_code.find("\\n", pos)) != std::string::npos) {
+                gdscript_code.replace(pos, 2, "\n");
+                pos += 1;
+            }
+        }
     } else {
         // Default test code
         gdscript_code = "func test():\n    return 42\n";

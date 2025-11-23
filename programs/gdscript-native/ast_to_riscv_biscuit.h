@@ -30,8 +30,8 @@ private:
     
     // RISC-V registers: a0-a7 (arguments/returns), t0-t6 (temporaries), s0-s11 (saved)
     static constexpr biscuit::GPR _temp_regs[] = {
-        biscuit::GPR::T0, biscuit::GPR::T1, biscuit::GPR::T2,
-        biscuit::GPR::T3, biscuit::GPR::T4, biscuit::GPR::T5, biscuit::GPR::T6
+        biscuit::t0, biscuit::t1, biscuit::t2,
+        biscuit::t3, biscuit::t4, biscuit::t5, biscuit::t6
     };
     static constexpr size_t _num_temp_regs = 7;
     

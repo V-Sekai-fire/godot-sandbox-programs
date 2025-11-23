@@ -1,6 +1,0 @@
-/Users/ernest.lee/Downloads/godot-sandbox-programs/programs/gdscript-native/tests/build/CMakeFiles/test_parser.dir
-/Users/ernest.lee/Downloads/godot-sandbox-programs/programs/gdscript-native/tests/build/CMakeFiles/test_compiler.dir
-/Users/ernest.lee/Downloads/godot-sandbox-programs/programs/gdscript-native/tests/build/CMakeFiles/test_dataset.dir
-/Users/ernest.lee/Downloads/godot-sandbox-programs/programs/gdscript-native/tests/build/CMakeFiles/test_elf_generation.dir
-/Users/ernest.lee/Downloads/godot-sandbox-programs/programs/gdscript-native/tests/build/CMakeFiles/edit_cache.dir
-/Users/ernest.lee/Downloads/godot-sandbox-programs/programs/gdscript-native/tests/build/CMakeFiles/rebuild_cache.dir

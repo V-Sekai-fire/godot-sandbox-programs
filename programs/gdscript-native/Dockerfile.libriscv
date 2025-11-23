@@ -5,18 +5,19 @@ FROM ubuntu:22.04
 RUN apt-get update && apt-get install -y \
     build-essential \
     cmake \
-    git \
     && rm -rf /var/lib/apt/lists/*
 
-# Clone and build libriscv (it needs to be built, not just headers)
-RUN git clone https://github.com/fwsGonzo/libriscv.git /tmp/libriscv && \
-    cd /tmp/libriscv && \
+WORKDIR /workspace
+
+# Copy libriscv from thirdparty (git subrepo)
+COPY thirdparty/libriscv /workspace/thirdparty/libriscv
+
+# Build libriscv
+RUN cd /workspace/thirdparty/libriscv && \
     mkdir -p build && cd build && \
     cmake .. -DCMAKE_BUILD_TYPE=Release && \
     make -j$(nproc) && \
     make install
-
-WORKDIR /workspace
 
 # Copy test program and ELF file
 COPY test_libriscv.cpp .

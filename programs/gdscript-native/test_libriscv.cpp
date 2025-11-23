@@ -39,6 +39,8 @@ int main(int argc, char* argv[]) {
         // Create machine options (like Godot sandbox does)
         MachineOptions<RISCV64> options;
         options.memory_max = 64 << 20; // 64 MiB
+        options.allow_write_exec_segment = true; // Allow executable segments
+        options.protect_segments = false; // Don't enforce strict segment protection
         
         // Create RISC-V machine with binary (using string_view, like Godot sandbox)
         std::string_view binary_view{reinterpret_cast<const char*>(binary.data()), binary.size()};

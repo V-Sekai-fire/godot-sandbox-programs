@@ -43,6 +43,9 @@ git subrepo status
 ```bash
 git subrepo pull thirdparty/stablehlo
 git subrepo pull thirdparty/llvm-project
+git subrepo pull thirdparty/libriscv
+git subrepo pull thirdparty/biscuit
+git subrepo pull thirdparty/godot-dodo
 git subrepo pull programs/gdscript-native/test_data
 ```
 
@@ -67,6 +70,32 @@ thirdparty/godot-dodo/data/godot_dodo_4x_60k/godot_dodo_4x_60k_data.json
 
 Note: There is also a copy/symlink at `programs/gdscript-native/test_data/` for convenience.
 
+## libriscv
+
+[libriscv](https://github.com/fwsGonzo/libriscv) is a RISC-V emulator/sandbox library used for testing ELF binaries. It's the same library used by Godot sandbox internally.
+
+### Setup
+
+libriscv is a header-only library with optional CMake build. To use it:
+
+```bash
+# Update libriscv subrepo
+git subrepo pull thirdparty/libriscv
+```
+
+### Usage
+
+Include the headers:
+```cpp
+#include <libriscv/machine.hpp>
+```
+
+Link against libriscv (if using CMake build):
+```cmake
+find_package(riscv REQUIRED)
+target_link_libraries(your_target riscv)
+```
+
 ## Directory Structure
 
 ```
@@ -74,6 +103,8 @@ thirdparty/
 ├── stablehlo/          # StableHLO repository (git subrepo)
 ├── llvm-project/       # LLVM project repository (git subrepo)
 ├── godot-dodo/         # GDScript dataset (godot-dodo, git subrepo)
+├── libriscv/           # RISC-V emulator library (git subrepo)
+├── biscuit/            # RISC-V code generator (git subrepo)
 └── llvm-build/         # LLVM build directory (not in git)
 
 programs/gdscript-native/

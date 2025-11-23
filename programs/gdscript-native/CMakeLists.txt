@@ -21,5 +21,11 @@ add_ci_program(gdscript_native
 # Biscuit is header-only, just need to include the directory
 target_include_directories(gdscript_native PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../thirdparty/biscuit/include)
 
+# Set C++20 standard (required for biscuit library)
+set_target_properties(gdscript_native PROPERTIES
+    CXX_STANDARD 20
+    CXX_STANDARD_REQUIRED ON
+)
+
 # No linking needed - biscuit is header-only
 # (no MLIR/StableHLO, no external assembler library needed)

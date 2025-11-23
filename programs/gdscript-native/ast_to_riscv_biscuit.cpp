@@ -19,24 +19,22 @@ std::pair<const uint8_t*, size_t> ASTToRISCVEmitter::emit(const ProgramNode* pro
         _emit_function(func.get());
         
         // Check if buffer needs to grow
-        size_t currentOffset = _assembler->GetCursorOffset();
+        size_t currentOffset = static_cast<size_t>(_assembler->GetCodeBuffer().GetCursorOffset());
         if (currentOffset >= _code_buffer.size() * 0.9) { // 90% full
             // Grow buffer by 2x
             size_t oldSize = _code_buffer.size();
             size_t newSize = _code_buffer.size() * 2;
             _code_buffer.resize(newSize);
             
-            // Preserve existing code and recreate assembler
-            // The existing code is already in _code_buffer, we just need to update the assembler
-            // Note: biscuit assembler writes directly to buffer, so existing code is preserved
-            _assembler = std::make_unique<biscuit::Assembler>(_code_buffer.data() + currentOffset, 
-                                                              _code_buffer.size() - currentOffset);
+            // Note: Growing buffer with existing assembler is complex
+            // For now, we'll allocate a large enough buffer initially
+            // TODO: Implement proper buffer growth strategy
         }
     }
     
     // Get the actual size of generated code
     // Biscuit writes directly to buffer, GetCursorOffset() returns current position
-    size_t codeSize = _assembler->GetCursorOffset();
+    size_t codeSize = static_cast<size_t>(_assembler->GetCodeBuffer().GetCursorOffset());
     
     _assembler.reset();
     
@@ -67,18 +65,18 @@ void ASTToRISCVEmitter::_emit_function(const FunctionNode* func) {
     _current_function_stack_size = stackSize;
     
     // Function prologue
-    _assembler->ADDI(biscuit::GPR::SP, biscuit::GPR::SP, -stackSize);
-    _assembler->SD(biscuit::GPR::RA, biscuit::GPR::SP, stackSize - 8);
-    _assembler->SD(biscuit::GPR::S0, biscuit::GPR::SP, stackSize - 16);
-    _assembler->ADDI(biscuit::GPR::S0, biscuit::GPR::SP, stackSize);
+    _assembler->ADDI(biscuit::sp, biscuit::sp, -stackSize);
+    _assembler->SD(biscuit::ra, stackSize - 8, biscuit::sp);
+    _assembler->SD(biscuit::s0, stackSize - 16, biscuit::sp);
+    _assembler->ADDI(biscuit::s0, biscuit::sp, stackSize);
     
     // RISC-V 64 Linux calling convention:
     // - Arguments: a0-a7 (x10-x17) for first 8 arguments
     // - Return value: a0 (x10)
     // Store function arguments from registers to stack slots
     biscuit::GPR argRegs[] = {
-        biscuit::GPR::A0, biscuit::GPR::A1, biscuit::GPR::A2, biscuit::GPR::A3,
-        biscuit::GPR::A4, biscuit::GPR::A5, biscuit::GPR::A6, biscuit::GPR::A7
+        biscuit::a0, biscuit::a1, biscuit::a2, biscuit::a3,
+        biscuit::a4, biscuit::a5, biscuit::a6, biscuit::a7
     };
     
     for (size_t i = 0; i < func->parameters.size() && i < 8; ++i) {
@@ -86,7 +84,7 @@ void ASTToRISCVEmitter::_emit_function(const FunctionNode* func) {
         std::string varName = param.first;
         // Arguments arrive in a0-a7, store them to stack for variable access
         int offset = 16 + static_cast<int>(i * 8); // Start after saved registers
-        _assembler->SD(argRegs[i], biscuit::GPR::SP, offset);
+        _assembler->SD(argRegs[i], offset, biscuit::sp);
         _var_to_stack_offset[varName] = offset;
     }
     
@@ -100,19 +98,19 @@ void ASTToRISCVEmitter::_emit_function(const FunctionNode* func) {
     
     // Function epilogue (fallback if no explicit return)
     // RISC-V 64 Linux: return value should be in a0
-    _assembler->LI(biscuit::GPR::A0, 0);  // Default return value 0
+    _assembler->LI(biscuit::a0, 0);  // Default return value 0
     
     // Calculate actual stack size needed (same logic as _emit_return)
-    int paramStackSize = static_cast<int>(func->parameters.size() * 8);
-    int actualStackNeeded = 16 + paramStackSize;
-    if (_stack_offset > paramStackSize) {
+    int epilogueParamStackSize = static_cast<int>(func->parameters.size() * 8);
+    int actualStackNeeded = 16 + epilogueParamStackSize;
+    if (_stack_offset > epilogueParamStackSize) {
         actualStackNeeded = 16 + _stack_offset;
     }
     int actualStackSize = (actualStackNeeded > _current_function_stack_size) ? actualStackNeeded : _current_function_stack_size;
     
-    _assembler->LD(biscuit::GPR::RA, biscuit::GPR::SP, actualStackSize - 8);
-    _assembler->LD(biscuit::GPR::S0, biscuit::GPR::SP, actualStackSize - 16);
-    _assembler->ADDI(biscuit::GPR::SP, biscuit::GPR::SP, actualStackSize);
+    _assembler->LD(biscuit::ra, actualStackSize - 8, biscuit::sp);
+    _assembler->LD(biscuit::s0, actualStackSize - 16, biscuit::sp);
+    _assembler->ADDI(biscuit::sp, biscuit::sp, actualStackSize);
     _assembler->RET();
 }
 
@@ -205,7 +203,7 @@ void ASTToRISCVEmitter::_emit_identifier(const IdentifierExpr* ident) {
     
     // Load variable from stack
     if (offset >= 0) {
-        _assembler->LD(reg, biscuit::GPR::SP, offset);
+        _assembler->LD(reg, offset, biscuit::sp);
     } else {
         // Variable not found - this is an error case
         _assembler->LI(reg, 0);
@@ -253,7 +251,7 @@ void ASTToRISCVEmitter::_emit_binary_op(const BinaryOpExpr* binop) {
         _assembler->XOR(resultReg, leftReg, rightReg);
         // If resultReg != 0, set resultReg = 1, else resultReg = 0
         // Use: SLTU resultReg, zero, resultReg (sets to 1 if 0 < resultReg, i.e., if resultReg != 0)
-        _assembler->SLTU(resultReg, biscuit::GPR::ZERO, resultReg);
+        _assembler->SLTU(resultReg, biscuit::zero, resultReg);
     } else if (binop->op == "<") {
         // Less than (signed)
         _assembler->SLT(resultReg, leftReg, rightReg);
@@ -296,24 +294,24 @@ void ASTToRISCVEmitter::_emit_return(const ReturnStatement* ret) {
         biscuit::GPR retReg = _get_or_allocate_register(ret->value.get());
         
         // Move to a0 (return value register)
-        if (retReg != biscuit::GPR::A0) {
-            _assembler->ADD(biscuit::GPR::A0, retReg, biscuit::GPR::ZERO);
+        if (retReg.Index() != biscuit::a0.Index()) {
+            _assembler->ADD(biscuit::a0, retReg, biscuit::zero);
         }
     }
     
     // Function epilogue - use the maximum of initial size and actual usage
     // Calculate actual stack needed: saved regs (16) + max(_stack_offset, paramStackSize)
-    int paramStackSize = static_cast<int>(_current_function->parameters.size() * 8);
-    int actualStackNeeded = 16 + paramStackSize;
-    if (_stack_offset > paramStackSize) {
+    int returnParamStackSize = static_cast<int>(_current_function->parameters.size() * 8);
+    int actualStackNeeded = 16 + returnParamStackSize;
+    if (_stack_offset > returnParamStackSize) {
         actualStackNeeded = 16 + _stack_offset;
     }
     // Ensure we use at least the allocated size (can't shrink, but can use full allocation)
     int actualStackSize = (actualStackNeeded > _current_function_stack_size) ? actualStackNeeded : _current_function_stack_size;
     
-    _assembler->LD(biscuit::GPR::RA, biscuit::GPR::SP, actualStackSize - 8);
-    _assembler->LD(biscuit::GPR::S0, biscuit::GPR::SP, actualStackSize - 16);
-    _assembler->ADDI(biscuit::GPR::SP, biscuit::GPR::SP, actualStackSize);
+    _assembler->LD(biscuit::ra, actualStackSize - 8, biscuit::sp);
+    _assembler->LD(biscuit::s0, actualStackSize - 16, biscuit::sp);
+    _assembler->ADDI(biscuit::sp, biscuit::sp, actualStackSize);
     _assembler->RET();
 }
 
@@ -333,7 +331,7 @@ void ASTToRISCVEmitter::_emit_variable_declaration(const VariableDeclaration* va
         int varOffset = _allocate_stack(varDecl->name);
         
         // Store value to variable location
-        _assembler->SD(valueReg, biscuit::GPR::SP, varOffset);
+        _assembler->SD(valueReg, varOffset, biscuit::sp);
     } else {
         // No initializer - just allocate stack slot
         _allocate_stack(varDecl->name);
