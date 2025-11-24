@@ -568,13 +568,7 @@ void ASTInterpreter::_execute_while_statement(const WhileStatement* while_stmt, 
         return;
     }
     
-    // Safety: prevent infinite loops (max 1000000 iterations)
-    const int64_t MAX_ITERATIONS = 1000000;
-    int64_t iteration_count = 0;
-    
-    while (iteration_count < MAX_ITERATIONS) {
-        iteration_count++;
-        
+    while (true) {
         // Reset break/continue flags for each iteration
         frame.should_break = false;
         frame.should_continue = false;
@@ -608,9 +602,6 @@ void ASTInterpreter::_execute_while_statement(const WhileStatement* while_stmt, 
             }
         }
     }
-    
-    // If we hit max iterations, the loop was likely infinite
-    // This is a safety measure to prevent hangs
 }
 
 ASTInterpreter::Value ASTInterpreter::_literal_to_value(const LiteralExpr* lit) {
