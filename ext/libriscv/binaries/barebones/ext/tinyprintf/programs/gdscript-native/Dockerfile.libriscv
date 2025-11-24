@@ -1,0 +1,31 @@
+# Dockerfile to test ELF file with libriscv
+FROM ubuntu:22.04
+
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+
+# Copy libriscv from thirdparty (git subrepo)
+COPY thirdparty/libriscv /workspace/thirdparty/libriscv
+
+# Build libriscv
+RUN cd /workspace/thirdparty/libriscv && \
+    mkdir -p build && cd build && \
+    cmake .. -DCMAKE_BUILD_TYPE=Release && \
+    make -j$(nproc) && \
+    make install
+
+# Copy test program and ELF file
+COPY test_libriscv.cpp .
+COPY test_output/simple.elf test_output/
+
+# Build test program
+RUN g++ -std=c++20 -o test_libriscv test_libriscv.cpp -lriscv
+
+# Run test
+CMD ["./test_libriscv", "test_output/simple.elf"]
+

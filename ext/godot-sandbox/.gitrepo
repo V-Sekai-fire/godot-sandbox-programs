@@ -1,0 +1,12 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/ingydotnet/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/libriscv/godot-sandbox.git
+	branch = main
+	commit = 35dce4348cf4d8d46a688c4142cc759d9a84bf50
+	parent = dd6446364a0510016d35a35f88105b3c10f2d53c
+	method = merge
+	cmdver = 0.4.9

@@ -1,0 +1,160 @@
+name: GDScript Compiler Tests
+
+on:
+  push:
+    branches: [ main, gdscript ]
+    paths:
+      - 'programs/gdscript-native/**'
+      - '.github/workflows/test-gdscript-compiler.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'programs/gdscript-native/**'
+      - '.github/workflows/test-gdscript-compiler.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: false
+        # Git subrepo dependencies are already embedded in the repo
+
+    - name: Install dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y build-essential cmake git
+
+    - name: Build tests
+      working-directory: ${{github.workspace}}
+      run: |
+        # Disable RISCV binary translation to avoid FetchContent for tinycc
+        # Dependencies are already available via git subrepo in ext/
+        cmake -B build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DRISCV_BINARY_TRANSLATION=OFF -DRISCV_LIBTCC=OFF
+        if [ $? -ne 0 ]; then
+          echo "ERROR: CMake configuration failed"
+          exit 1
+        fi
+        # Build all test targets (excluding test_end_to_end_features which requires libriscv)
+        cmake --build build --target test_parser_basic test_parser_expressions test_parser_statements test_compiler_basic test_compiler_operators test_compiler_system test_compiler_codegen test_compiler_integration test_compiler_features test_compiler_execution --parallel 8
+        if [ $? -ne 0 ]; then
+          echo "ERROR: Test build failed"
+          exit 1
+        fi
+
+    - name: Verify test executables exist
+      working-directory: ${{github.workspace}}/build
+      run: |
+        echo "Checking for test executables..."
+        ls -la programs/gdscript-native/tests/ || echo "Tests directory not found"
+        find . -name "test_parser_*" -o -name "test_compiler_*" || echo "Test executables not found"
+
+    - name: Run parser basic tests
+      working-directory: ${{github.workspace}}/build
+      run: |
+        if [ -f programs/gdscript-native/tests/test_parser_basic ]; then
+          ./programs/gdscript-native/tests/test_parser_basic
+        else
+          echo "ERROR: test_parser_basic not found"
+          exit 1
+        fi
+
+    - name: Run parser expressions tests
+      working-directory: ${{github.workspace}}/build
+      run: |
+        if [ -f programs/gdscript-native/tests/test_parser_expressions ]; then
+          ./programs/gdscript-native/tests/test_parser_expressions
+        else
+          echo "ERROR: test_parser_expressions not found"
+          exit 1
+        fi
+
+    - name: Run parser statements tests
+      working-directory: ${{github.workspace}}/build
+      run: |
+        if [ -f programs/gdscript-native/tests/test_parser_statements ]; then
+          ./programs/gdscript-native/tests/test_parser_statements
+        else
+          echo "ERROR: test_parser_statements not found"
+          exit 1
+        fi
+
+    - name: Run compiler basic tests
+      working-directory: ${{github.workspace}}/build
+      run: |
+        if [ -f programs/gdscript-native/tests/test_compiler_basic ]; then
+          ./programs/gdscript-native/tests/test_compiler_basic
+        else
+          echo "ERROR: test_compiler_basic not found"
+          exit 1
+        fi
+
+    - name: Run compiler operators tests
+      working-directory: ${{github.workspace}}/build
+      run: |
+        if [ -f programs/gdscript-native/tests/test_compiler_operators ]; then
+          ./programs/gdscript-native/tests/test_compiler_operators
+        else
+          echo "ERROR: test_compiler_operators not found"
+          exit 1
+        fi
+
+    - name: Run compiler system tests
+      working-directory: ${{github.workspace}}/build
+      run: |
+        if [ -f programs/gdscript-native/tests/test_compiler_system ]; then
+          ./programs/gdscript-native/tests/test_compiler_system
+        else
+          echo "ERROR: test_compiler_system not found"
+          exit 1
+        fi
+
+    - name: Run compiler codegen tests
+      working-directory: ${{github.workspace}}/build
+      run: |
+        if [ -f programs/gdscript-native/tests/test_compiler_codegen ]; then
+          ./programs/gdscript-native/tests/test_compiler_codegen
+        else
+          echo "ERROR: test_compiler_codegen not found"
+          exit 1
+        fi
+
+    - name: Run compiler integration tests
+      working-directory: ${{github.workspace}}/build
+      run: |
+        if [ -f programs/gdscript-native/tests/test_compiler_integration ]; then
+          ./programs/gdscript-native/tests/test_compiler_integration
+        else
+          echo "ERROR: test_compiler_integration not found"
+          exit 1
+        fi
+
+    - name: Run compiler features tests
+      working-directory: ${{github.workspace}}/build
+      run: |
+        if [ -f programs/gdscript-native/tests/test_compiler_features ]; then
+          ./programs/gdscript-native/tests/test_compiler_features
+        else
+          echo "ERROR: test_compiler_features not found"
+          exit 1
+        fi
+
+    - name: Run compiler execution tests
+      working-directory: ${{github.workspace}}/build
+      run: |
+        if [ -f programs/gdscript-native/tests/test_compiler_execution ]; then
+          ./programs/gdscript-native/tests/test_compiler_execution
+        else
+          echo "ERROR: test_compiler_execution not found"
+          exit 1
+        fi
+

@@ -1,0 +1,12 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/ingydotnet/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/nmwsharp/geometry-central.git
+	branch = master
+	commit = 8579865362abd2185ef97d7ef0dae09338ab8ff1
+	parent = 60c923ea625a8d392ab3ceb167fdfaa7df3ced9c
+	method = merge
+	cmdver = 0.4.9

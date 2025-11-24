@@ -1,0 +1,12 @@
+# test_data/ is now a git subrepo, so it's tracked
+
+# Build artifacts
+build/
+*.elf
+test_output/
+test_elf_gen
+test_libriscv*
+test_page_check
+test_reset_check
+test_exec_segment
+test_debug_simulate

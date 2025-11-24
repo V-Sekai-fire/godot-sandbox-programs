@@ -26,4 +26,8 @@ if (NOT EMBEDDED_RISCV)
 	add_subdirectory(luajit)
 	add_subdirectory(mir)
 	add_subdirectory(robust_skin_weight_transfer)
+	# GDScript to RISC-V compiler
+	add_subdirectory(gdscript-native)
+	# GDScript VM - Port of Godot's bytecode VM
+	add_subdirectory(gdscript-vm)
 endif()

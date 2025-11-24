@@ -1,0 +1,12 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/ingydotnet/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/minosvasilias/godot-dodo
+	branch = main
+	commit = 39159d36d0df83097ec47558b97ebc2f80560912
+	parent = 1eb9916d29c64ab82ddc1fc81ba74cefaad9d0a9
+	method = merge
+	cmdver = 0.4.9
