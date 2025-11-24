@@ -29,11 +29,11 @@ set(PARSER_SOURCES
 #     ../ast_to_bytecode_adapter.cpp
 # )
 
-# Test runner
+# Test runner (parser tests only - VM tests require RISC-V platform)
 add_executable(test_vm_runner
     test_runner.cpp
     ${PARSER_SOURCES}
-    ${VM_SOURCES}
+    # ${VM_SOURCES}  # Disabled - requires RISC-V API
 )
 
 # Set C++20 standard
