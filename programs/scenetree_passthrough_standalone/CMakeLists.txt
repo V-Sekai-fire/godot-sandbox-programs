@@ -17,7 +17,7 @@
 # This standalone executable runs ON the target platform, not as RISC-V/ELF.
 
 cmake_minimum_required(VERSION 3.15)
-project(scenetree_passthrough_standalone LANGUAGE CXX)
+project(scenetree_passthrough_standalone LANGUAGES CXX)
 
 # ==================== Project Structure ====================
 get_filename_component(BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
