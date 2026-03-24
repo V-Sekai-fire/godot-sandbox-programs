@@ -1,57 +1,88 @@
-# Fetch godot-sandbox repository (add_subdirectory is implicitly called)
-include(FetchContent)
-FetchContent_Declare(
-	godot-sandbox
-	GIT_REPOSITORY https://github.com/libriscv/godot-sandbox.git
-	GIT_TAG        main
-	GIT_PROGRESS   TRUE
-	GIT_SHALLOW    TRUE
-	GIT_SUBMODULES ""
-	SOURCE_SUBDIR  "program/cpp/cmake"
-)
-FetchContent_MakeAvailable(godot-sandbox)
+# For standalone builds, we don't need godot-sandbox
+# The embedded RISC-V mode uses godot-sandbox, but standalone mode uses mock handlers
 
 function (add_ci_program name)
-	add_sandbox_program(${name} ${ARGN})
+	add_executable(${name} ${ARGN})
 	set_target_properties(${name} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 endfunction()
 
 # Build the trivial examples
-add_subdirectory(hello-world)
-
-
-# Build the examples that require full Linux/C++ support
+# NOTE: hello-world requires RISC-V godot-sandbox API (api.hpp with Sandbox class)
+# and is only built for embedded RISC-V targets. Skip for standalone builds.
 if (NOT EMBEDDED_RISCV)
-	add_subdirectory(asm)
-	add_subdirectory(gdscript)
-	add_subdirectory(libtcc)
-	add_subdirectory(luajit)
-	add_subdirectory(mir)
-	add_subdirectory(robust_skin_weight_transfer)
-	# NOTE: scenetree_passthrough (embedded) was disabled in PR #17.
-	# The handlers.cpp was replaced with mocks/handlers.cpp.
-	# Use scenetree_passthrough_standalone instead.
-	# add_subdirectory(scenetree_passthrough)
+	message(STATUS "Skipping hello-world (RISC-V only)")
+else()
+	add_subdirectory(hello-world)
 endif()
 
-# ==================== Common JSON-RPC Sublibrary ====================
+
+# ==================== Common JSON-RPC Library ====================
 # Shared infrastructure for both embedded and standalone modes.
-# Path: programs/scenetree_common (inside programs/)
+# This builds the scenetree_common library once.
 #
-# Set handler implementation for the common sublibrary:
+# Handler implementation is controlled by SCENETREE_HANDLERS:
 #   - "mock" for standalone/stdio (no Godot dependency)
 #   - "real" for embedded godot-sandbox (uses Godot C++ API)  
 #   - "none" if frontend provides its own handlers
 set(SCENETREE_HANDLERS "mock" CACHE STRING "Handler implementation: mock, real, or none")
 
-add_subdirectory(${CMAKE_SOURCE_DIR}/programs/scenetree_common ${CMAKE_BINARY_DIR}/common_jsonrpc)
+add_subdirectory(scenetree_common)
+
 
 # ==================== Standalone SceneTree Passthrough ====================
 # Builds a standalone executable (TCP/stdio server) using the common JSON-RPC sublibrary.
-# This variant builds even with EMBEDDED_RISCV enabled, as it's designed to run
-# in the RISC-V environment without requiring a full Godot scene.
-# Note: The standalone executable runs ON the target platform (Linux/macOS/Windows)
-# and is NOT a RISC-V/ELF binary. RISC-V/ELF builds are handled by godot-sandbox.
-if (NOT EMBEDDED_RISCV OR TRUE)  # Always build standalone for now
+# Only built when NOT in embedded RISC-V mode (i.e., building for host/native platform).
+# When EMBEDDED_RISCV=ON, we use godot-sandbox which provides the SceneTree via RISC-V VM.
+if (NOT EMBEDDED_RISCV)
+	# Build the standalone executable separately
+	# Pass the location of the already-built scenetree_common library
 	add_subdirectory(scenetree_passthrough_standalone)
+endif()
+
+
+# ==================== RISC-V Subdirectories (CI/CD Mode Only) ====================
+# These subdirectories require RISC-V64 Bootlin toolchain and are only built
+# when BUILD_FULL=ON (CI/CD mode). They are NOT needed for standalone builds.
+if (BUILD_FULL)
+	# asm - Godot AssemblyScript module (WebAssembly compilation target)
+	if (EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/ext/asm/CMakeLists.txt)
+		add_subdirectory(ext/asm)
+	else()
+		message(WARNING "asm subdirectory not found or disabled")
+	endif()
+	
+	# gdscript - Godot scripting language bindings/interpreter
+	if (EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/ext/gdscript/CMakeLists.txt)
+		add_subdirectory(ext/gdscript)
+	else()
+		message(WARNING "gdscript subdirectory not found or disabled")
+	endif()
+	
+	# libtcc - Tiny C Compiler library (JIT compilation for scripting)
+	if (EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/ext/libtcc/CMakeLists.txt)
+		add_subdirectory(ext/libtcc)
+	else()
+		message(WARNING "libtcc subdirectory not found or disabled")
+	endif()
+	
+	# luajit - LuaJIT Lua interpreter (embedded scripting)
+	if (EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/ext/luajit/CMakeLists.txt)
+		add_subdirectory(ext/luajit)
+	else()
+		message(WARNING "luajit subdirectory not found or disabled")
+	endif()
+	
+	# mir - MIR compiler (JIT for dynamic languages)
+	if (EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/ext/mir/CMakeLists.txt)
+		add_subdirectory(ext/mir)
+	else()
+		message(WARNING "mir subdirectory not found or disabled")
+	endif()
+	
+	# robust_skin_weight_transfer - Mesh skinning utilities
+	if (EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/ext/robust_skin_weight_transfer/CMakeLists.txt)
+		add_subdirectory(ext/robust_skin_weight_transfer)
+	else()
+		message(WARNING "robust_skin_weight_transfer subdirectory not found or disabled")
+	endif()
 endif()

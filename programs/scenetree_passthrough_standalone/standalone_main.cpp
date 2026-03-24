@@ -3,21 +3,24 @@
 #include <vector>
 #include <utility>
 
+// PUBLIC macro for standalone mode
+// Based on docker/api/syscalls_fwd.hpp definition
+#ifndef PUBLIC
+#define PUBLIC extern "C" __attribute__((used, retain))
+#endif
+
 // Standalone variant for x86_64 native execution
 // This version initializes Godot and starts JSON-RPC server directly,
 // without requiring a .tscn scene file or godot-sandbox RISC-V VM.
 
 // Global handler instance
 static JSONRPCHandler handler;
-static Object jsonrpc_tcp_server(0);
-static std::vector<Object> jsonrpc_clients;
+static Object* jsonrpc_tcp_server = nullptr;
+static std::vector<Object*> jsonrpc_clients;
 static bool jsonrpc_server_started = false;
 static int jsonrpc_server_port = 7777;
 
-#define DECLARE_RPC_WRAPPER(name) \
-    PUBLIC Dictionary name(const Array& callv_args) { \
-        return handler.handle_##name(callv_args); \
-    }
+#define PUBLIC
 
 DECLARE_RPC_WRAPPER(_initialize)
 DECLARE_RPC_WRAPPER(_physics_process)

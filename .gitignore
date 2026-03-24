@@ -14,3 +14,5 @@
 /.build_standalone
 /.build_test
 __pycache__
+/.build.riscv
+/build_standalone

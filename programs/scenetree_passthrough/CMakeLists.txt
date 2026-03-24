@@ -1,9 +1,15 @@
 cmake_minimum_required(VERSION 3.10)
 project(scenetree_passthrough)
 
+# For embedded RISC-V mode (godot-sandbox), use mock handlers
+# since we don't have full Godot C++ API access in the VM
+set(SCENETREE_HANDLERS "mock" CACHE STRING "Handler implementation: real, mock, or none")
+
+# Include the common handlers subdirectory
+add_subdirectory(${CMAKE_SOURCE_DIR}/programs/scenetree_common)
+
 add_ci_program(scenetree_passthrough
     main.cpp
-    handlers.cpp
 )
 
 # Define EMBEDDED_RISCV flag for the RISC-V embedded environment (godot-sandbox)

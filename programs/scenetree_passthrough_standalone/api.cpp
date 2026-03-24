@@ -1,6 +1,12 @@
 #include "api.hpp"
 #include "handlers.hpp"
 
+// PUBLIC macro for JSON-RPC API exports
+// Defined here so it's available for all API functions in this file
+#ifndef PUBLIC
+#define PUBLIC extern "C" __attribute__((used, retain))
+#endif
+
 // API function table for standalone mode
 // These functions are exported via callv ABI for JSON-RPC dispatch
 

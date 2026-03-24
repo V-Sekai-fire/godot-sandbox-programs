@@ -3,6 +3,7 @@
 // These return plausible responses without requiring Godot API access.
 
 #include "../../include/handler_base.hpp"
+#include "../../src/jsonrpc_server.hpp"
 #include <stdlib.h>  // for asprintf
 
 // ==================== Mock State ====================
@@ -93,15 +94,14 @@ const char* handle_mock_create_node(const char* params_json, int id) {
     return make_result(response);
 }
 
-// Mock: get_tree - returns tree structure
+// Mock: get_tree - returns tree structure  
 const char* handle_mock_get_tree(const char* params_json, int id) {
-    const char* response =
-        "{\"root\":{\"name\":\"root\",\"path\":\"/root\","
-        "\"children\":[",
-        "{\"name\":\"child1\",\"path\":\"/root/child1\"},",
-        "{\"name\":\"child2\",\"path\":\"/root/child2\"}",
-        "]}}";
-    return make_result(response);
+    return make_result(
+        "{\"root\":{\"name\":\"root\",\"path\":\"/root\",\"children\":[\""  
+        "{\"name\":\"child1\",\"path\":\"/root/child1\"},\""
+        "{\"name\":\"child2\",\"path\":\"/root/child2\"}"
+        "]}}"
+    );
 }
 
 // Mock: reload_current_scene - reloads scene

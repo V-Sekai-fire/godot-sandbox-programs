@@ -284,10 +284,12 @@ void jsonrpc_send_response(int id, const char* result_json) {
 
     if (id == 0 && jsonrpc_server.use_stdio) {
         // Special case for notifications without ID
+        // Result is already a JSON value (object, array, string, number, etc.)
         snprintf(response, sizeof(response),
-                 "{\"jsonrpc\":\"2.0\",\"result\":%s}\n",
+                 "%s\n",
                  result_json ? result_json : "null");
     } else {
+        // Result is already a JSON value - wrap it in response envelope
         snprintf(response, sizeof(response),
                  "{\"jsonrpc\":\"2.0\",\"result\":%s,\"id\":%d}\n",
                  result_json ? result_json : "null",

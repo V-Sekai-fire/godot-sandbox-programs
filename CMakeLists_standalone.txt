@@ -1,0 +1,49 @@
+# Standalone CMake configuration for scenetree_passthrough_standalone
+# This file is designed to build ONLY the standalone executable without godot-sandbox dependencies
+
+cmake_minimum_required(VERSION 3.15)
+project(scenetree_passthrough_standalone LANGUAGES CXX C)
+
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+# Include directories
+include_directories(
+    "${CMAKE_CURRENT_SOURCE_DIR}/programs/scenetree_common/include"
+    "${CMAKE_CURRENT_SOURCE_DIR}/programs/scenetree_common/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/programs/scenetree_passthrough_standalone"
+    "${CMAKE_CURRENT_SOURCE_DIR}/api"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ext"
+)
+
+# Add the common JSON-RPC library
+add_subdirectory(
+    "${CMAKE_CURRENT_SOURCE_DIR}/programs/scenetree_common"
+    "${CMAKE_BINARY_DIR}/common_jsonrpc"
+)
+
+# Add the standalone executable
+add_executable(scenetree_passthrough_standalone
+    "${CMAKE_CURRENT_SOURCE_DIR}/programs/scenetree_passthrough_standalone/standalone_main.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/programs/scenetree_passthrough_standalone/standalone_jsonrpc.cpp"
+)
+
+target_link_libraries(scenetree_passthrough_standalone PRIVATE scenetree_common)
+
+# Compiler warnings
+target_compile_options(scenetree_passthrough_standalone PRIVATE
+    -Wall
+    -Wextra
+    -Wpedantic
+    -Wno-unused-parameter
+)
+
+# Output directory
+set_target_properties(scenetree_passthrough_standalone PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+)
+
+message(STATUS "Build targets:")
+message(STATUS "  - scenetree_passthrough_standalone (executable)")
