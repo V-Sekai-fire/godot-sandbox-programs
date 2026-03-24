@@ -30,10 +30,12 @@ message(STATUS "  Common dir: ${COMMON_DIR}")
 # ==================== Common JSON-RPC Library ====================
 # Include the common sublibrary (JSON-RPC server framework + mock handlers)
 # Mock handlers are used since the standalone executable doesn't have Godot API access.
+# Set the handler implementation for scenetree_common (built by programs/CMakeLists.txt)
 set(SCENETREE_HANDLERS "mock" CACHE STRING "Handler implementation to use")
-add_subdirectory(${COMMON_DIR} ${CMAKE_BINARY_DIR}/common_jsonrpc)
-
-# Set C++ standard
+# Note: The scenetree_common subdirectory is already built by programs/CMakeLists.txt.
+# We just need the headers and the compiled library from the parent scope.
+# Setting SCENETREE_HANDLERS makes the COMMON_DIR's CMakeLists use the mock handlers.
+# include_directories(${COMMON_DIR}/include ${COMMON_DIR}/src)
 enable_language(CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

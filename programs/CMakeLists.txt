@@ -28,13 +28,16 @@ if (NOT EMBEDDED_RISCV)
 	add_subdirectory(luajit)
 	add_subdirectory(mir)
 	add_subdirectory(robust_skin_weight_transfer)
-	add_subdirectory(scenetree_passthrough)
+	# NOTE: scenetree_passthrough (embedded) was disabled in PR #17.
+	# The handlers.cpp was replaced with mocks/handlers.cpp.
+	# Use scenetree_passthrough_standalone instead.
+	# add_subdirectory(scenetree_passthrough)
 endif()
 
 # ==================== Common JSON-RPC Sublibrary ====================
 # Shared infrastructure for both embedded and standalone modes.
 # Path: programs/scenetree_common (inside programs/)
-
+#
 # Set handler implementation for the common sublibrary:
 #   - "mock" for standalone/stdio (no Godot dependency)
 #   - "real" for embedded godot-sandbox (uses Godot C++ API)  

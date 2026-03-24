@@ -335,7 +335,7 @@ int main() {
     ADD_API_FUNCTION(_property_can_revert, "Dictionary", "Array callv_args", "Virtual API binding");
     ADD_API_FUNCTION(_property_get_revert, "Dictionary", "Array callv_args", "Virtual API binding");
     ADD_API_FUNCTION(_iter_init, "Dictionary", "Array callv_args", "Virtual API binding");
-    ADD_APIFUNCTION(_iter_next, "Dictionary", "Array callv_args", "Virtual API binding");
+    ADD_API_FUNCTION(_iter_next, "Dictionary", "Array callv_args", "Virtual API binding");
     ADD_API_FUNCTION(_iter_get, "Dictionary", "Array callv_args", "Virtual API binding");
     
     ADD_API_FUNCTION(start_jsonrpc_server, "Dictionary", "Array callv_args", 
