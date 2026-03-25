@@ -39,6 +39,12 @@ if (NOT EMBEDDED_RISCV)
 	add_subdirectory(scenetree_passthrough_standalone)
 endif()
 
+# ==================== Standalone Tests ====================
+# Build tests for the standalone executable using RapidCheck
+if (NOT EMBEDDED_RISCV)
+	add_subdirectory(scenetree_passthrough_standalone/test)
+endif()
+
 
 # ==================== RISC-V Subdirectories (CI/CD Mode Only) ====================
 # These subdirectories require RISC-V64 Bootlin toolchain and are only built

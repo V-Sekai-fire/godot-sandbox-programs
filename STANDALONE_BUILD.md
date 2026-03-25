@@ -135,6 +135,86 @@ EOF
 #    (This requires significant work to convert all handlers to mock implementations)
 ```
 
+## Property-Based Testing with RapidCheck
+
+For comprehensive property-based testing of the JSON-RPC API, we integrate [RapidCheck](https://github.com/emil-e/rapidcheck), a C++ framework for property-based testing inspired by QuickCheck.
+
+### Setting Up RapidCheck
+
+RapidCheck is included as a submodule in `programs/scenetree_passthrough_standalone/rapidcheck`:
+
+```bash
+cd programs/scenetree_passthrough_standalone
+git submodule update --init --recursive
+```
+
+### Building Tests
+
+To build the RapidCheck property tests:
+
+```bash
+cd godot-sandbox-programs
+mkdir -p build && cd build
+cmake .. -DBUILD_RAPIDCHECK_TESTS=ON
+make -j$(nproc)
+```
+
+### Running Tests
+
+Run all property tests:
+
+```bash
+ctest --output-on-failure
+```
+
+Or run tests manually:
+
+```bash
+./test/jsonrpc_compliance
+```
+
+### Available Property Tests
+
+The test suite includes properties for:
+
+1. **Request Structure** - Every valid request has required fields (`jsonrpc`, `method`)
+2. **JSON-RPC Version** - Version must always be "2.0"
+3. **Method Names** - Must be valid identifiers (alphanumeric + underscore)
+4. **Parameter Types** - Can be arrays, objects, or omitted
+5. **Error Responses** - Must have `code` and `message` fields
+6. **ID Preservation** - IDs are preserved between request and response
+
+### Writing New Property Tests
+
+Add new test functions following the pattern:
+
+```cpp
+void myPropertyTest() {
+    check(
+        "Description of the property",
+        []() {
+            // Test logic using RapidCheck generators
+            RC_ASSERT(condition);
+        }
+    );
+}
+```
+
+Common generators available:
+- `numeric<T>()` - Random numeric values
+- `text()` - Random strings
+- `element(vector)` - Random choice from a list
+- `container(vector, generator)` - Random-sized container
+- `map(map, keyGen, valueGen)` - Random key-value map
+
+### Test Output Example
+
+```
+=== All RapidCheck property tests PASSED ===
+```
+
+If a property fails, RapidCheck will shrink the input to find the minimal counterexample.
+
 ## Future Work
 
 The ideal solution is to:
